@@ -4,15 +4,14 @@
  *   npm run sim -- --seed 42 --days 3
  *   npm run sim -- --seed 42 --ticks 500 --off c3-climate
  *   npm run sim -- --seed 7 --biome tundra --hills mountainous --map
+ *   npm run sim -- --seed 7 --days 60 --climate   # one line per day: temperatures, weather, snow
  */
 import { parseArgs } from 'node:util';
 import { performance } from 'node:perf_hooks';
-import { SECONDS_PER_TICK, Simulation } from '../src/core';
+import { Simulation } from '../src/core';
 import { ALL_MODULES } from '../src/modules';
 import { worldMap, type WorldSettings } from '../src/modules/f1-world';
-
-/** A Verity day is 26 hours. */
-const TICKS_PER_DAY = (26 * 3600) / SECONDS_PER_TICK;
+import { clock, TICKS_PER_DAY, TICKS_PER_HOUR, type TimeSettings } from '../src/modules/f2-time';
 
 const { values } = parseArgs({
   options: {
@@ -24,6 +23,8 @@ const { values } = parseArgs({
     hills: { type: 'string' },
     river: { type: 'string' },
     map: { type: 'boolean', default: false },
+    season: { type: 'string' },
+    climate: { type: 'boolean', default: false },
   },
 });
 
@@ -39,11 +40,47 @@ if (values.biome) world.biome = values.biome;
 if (values.hills) world.hilliness = values.hills as NonNullable<WorldSettings['hilliness']>;
 if (values.river) world.river = values.river === 'yes';
 
+const time: TimeSettings = {};
+if (values.season) time.startSeason = values.season as NonNullable<TimeSettings['startSeason']>;
+
 const tStart = performance.now();
-const sim = Simulation.create({ seed, modules: ALL_MODULES, disabled: values.off, settings: { 'f1-world': world } });
+const sim = Simulation.create({
+  seed,
+  modules: ALL_MODULES,
+  disabled: values.off,
+  settings: { 'f1-world': world, 'f2-time': time },
+});
 const startMs = performance.now() - tStart;
+const hasTime = sim.modules.some((m) => m.id === 'f2-time');
 const t0 = performance.now();
-sim.step(ticks);
+if (values.climate && hasTime) {
+  // Sample every hour and print one line per day.
+  const c = sim.services.get(clock);
+  console.log('day                    min°C  max°C  weather (hours)                         snow cm  spell');
+  for (let done = 0; done < ticks; ) {
+    let min = Infinity;
+    let max = -Infinity;
+    const hours = new Map<string, number>();
+    const date = c.now();
+    for (let h = 0; h < TICKS_PER_DAY / TICKS_PER_HOUR && done < ticks; h++) {
+      const t = c.outdoorTemperature();
+      min = Math.min(min, t);
+      max = Math.max(max, t);
+      hours.set(c.weatherName(), (hours.get(c.weatherName()) ?? 0) + 1);
+      const step = Math.min(TICKS_PER_HOUR, ticks - done);
+      sim.step(step);
+      done += step;
+    }
+    const label = `Y${date.year} ${date.season} ${date.dayOfSeason}`.padEnd(22);
+    const weather = [...hours].map(([k, v]) => `${k} ${v}`).join(', ').padEnd(40);
+    // Deepest snow on the map, which is what lies on open ground.
+    let snow = 0;
+    for (let y = 0; y < sim.world.height; y += 5) for (let x = 0; x < sim.world.width; x += 5) snow = Math.max(snow, c.snowAt(x, y));
+    console.log(`${label} ${min.toFixed(0).padStart(5)}  ${max.toFixed(0).padStart(5)}  ${weather} ${snow.toFixed(1).padStart(6)}  ${c.spell()}`);
+  }
+} else {
+  sim.step(ticks);
+}
 const elapsed = performance.now() - t0;
 
 console.log(`seed        ${seed}`);
@@ -53,6 +90,11 @@ console.log(`new game  ${startMs.toFixed(0)} ms`);
 console.log(`ticks       ${ticks} (${(ticks / TICKS_PER_DAY).toFixed(2)} days)`);
 console.log(`time        ${elapsed.toFixed(0)} ms (${ticks > 0 ? (elapsed / ticks).toFixed(4) : '0'} ms/tick)`);
 console.log(`world hash  ${sim.hash()}`);
+if (hasTime) {
+  const c = sim.services.get(clock);
+  const d = c.now();
+  console.log(`now         Year ${d.year}, ${d.season} ${d.dayOfSeason}, ${String(d.hour).padStart(2, '0')}:${String(d.minute).padStart(2, '0')}, ${c.outdoorTemperature().toFixed(1)}°C, ${c.weatherName()}`);
+}
 
 if (sim.modules.some((m) => m.id === 'f1-world')) {
   const map = sim.services.get(worldMap);

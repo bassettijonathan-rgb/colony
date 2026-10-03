@@ -19,6 +19,8 @@ const world: Record<string, unknown> = {};
 if (params.get('biome')) world.biome = params.get('biome');
 if (params.get('hills')) world.hilliness = params.get('hills');
 if (params.get('river')) world.river = params.get('river') === 'yes';
+const time: Record<string, unknown> = {};
+if (params.get('season')) time.startSeason = params.get('season');
 
 const state: Omit<AppProps, 'onSpeed'> = {
   seed,
@@ -27,6 +29,7 @@ const state: Omit<AppProps, 'onSpeed'> = {
   speed: 1,
   modules: [],
   summary: '',
+  sky: null,
   hover: '',
   error: null,
 };
@@ -64,6 +67,12 @@ worker.onmessage = (event: MessageEvent<FromWorker>) => {
     case 'tick':
       state.tick = msg.tick;
       state.tickMs = msg.tickMs;
+      state.sky = msg.sky;
+      view.setLight(msg.sky.light);
+      if (msg.layers && map) {
+        Object.assign(map.layers, msg.layers);
+        view.updateLayers(map, msg.layers);
+      }
       break;
     case 'error':
       state.error = msg.message;
@@ -74,5 +83,5 @@ worker.onmessage = (event: MessageEvent<FromWorker>) => {
 
 void view.mount(mapEl).then(() => {
   redraw();
-  send({ type: 'start', seed, settings: { 'f1-world': world } });
+  send({ type: 'start', seed, settings: { 'f1-world': world, 'f2-time': time } });
 });

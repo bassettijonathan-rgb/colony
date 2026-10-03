@@ -1,7 +1,18 @@
-/**
- * Biomes decide what a map looks like. Climate (temperatures, seasons) is
- * added by the time and weather module later.
- */
+/** Read by the time and weather module. Temperatures in °C. */
+export interface ClimateDef {
+  /** Average temperature over the year. */
+  meanTemp: number;
+  /** Mid-summer is this much warmer than the mean, mid-winter this much colder. */
+  seasonalSwing: number;
+  /** Mid-afternoon is this much warmer than the day's average, the small hours this much colder. */
+  dailySwing: number;
+  /** Typical size of multi-day warm and cold spells. */
+  variability: number;
+  /** How often it rains or snows, 1 = normal. */
+  rainfall: number;
+}
+
+/** Biomes decide what a map looks like and what its climate is. */
 export interface BiomeDef {
   id: string;
   name: string;
@@ -20,6 +31,7 @@ export interface BiomeDef {
   frozenLakes: boolean;
   /** Rock types that can appear; each map picks two or three. */
   rocks: readonly string[];
+  climate: ClimateDef;
 }
 
 export const BIOMES: readonly BiomeDef[] = [
@@ -35,6 +47,7 @@ export const BIOMES: readonly BiomeDef[] = [
     sand: 0.02,
     frozenLakes: false,
     rocks: ['granite', 'limestone', 'slate', 'sandstone'],
+    climate: { meanTemp: 8, seasonalSwing: 14, dailySwing: 5, variability: 4, rainfall: 1 },
   },
   {
     id: 'boreal-forest',
@@ -48,6 +61,7 @@ export const BIOMES: readonly BiomeDef[] = [
     sand: 0.02,
     frozenLakes: false,
     rocks: ['granite', 'slate', 'basalt'],
+    climate: { meanTemp: -1, seasonalSwing: 18, dailySwing: 5, variability: 5, rainfall: 0.9 },
   },
   {
     id: 'arid-shrubland',
@@ -61,6 +75,7 @@ export const BIOMES: readonly BiomeDef[] = [
     sand: 0.35,
     frozenLakes: false,
     rocks: ['sandstone', 'limestone', 'granite'],
+    climate: { meanTemp: 22, seasonalSwing: 9, dailySwing: 10, variability: 3, rainfall: 0.3 },
   },
   {
     id: 'tundra',
@@ -74,6 +89,7 @@ export const BIOMES: readonly BiomeDef[] = [
     sand: 0.05,
     frozenLakes: true,
     rocks: ['granite', 'basalt', 'slate'],
+    climate: { meanTemp: -12, seasonalSwing: 15, dailySwing: 4, variability: 6, rainfall: 0.6 },
   },
 ];
 

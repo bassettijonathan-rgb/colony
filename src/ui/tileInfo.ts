@@ -24,5 +24,7 @@ export function describeTile(map: MapSnapshot, x: number, y: number): string {
     if (ground && ground.moveCost === 0) parts.push('impassable');
     else if (ground && ground.moveCost > 1) parts.push(`slow going (x${ground.moveCost})`);
   }
+  const snowMm = map.layers.snow?.[i] ?? 0;
+  if (snowMm > 0) parts.push(`snow ${Math.max(1, Math.round(snowMm / 10))} cm`);
   return `${x}, ${y}: ${parts.join(', ')}`;
 }

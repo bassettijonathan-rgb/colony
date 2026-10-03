@@ -63,7 +63,11 @@ A module is a `defineModule({...})` object (see `src/core/module.ts` and the sam
   and are delivered after the phase that emitted them.
 - `commands`: player command handlers. Command types are declared by augmenting `CommandMap`.
 
-One tick is 5 in-game seconds; 1x speed is 10 ticks per real second. A Verity day is 26 hours.
+A module that changes a tile layer after the game starts calls `touchLayer(world, name)` so the page
+redraws it.
+
+One tick is 5 in-game seconds; 1x speed is 10 ticks per real second. A Verity day is 26 hours, a season 15 days, a year
+60 days (constants in `src/modules/f2-time/api.ts`).
 
 ## Performance budget
 

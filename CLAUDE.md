@@ -42,6 +42,7 @@ file holds the rules the code must follow.
 6. **Every new rule gets a test.** Each module has tests for its own rules plus the module-off test
    (`expectRunsWithout` in `tests/helpers.ts`, run for every module in `tests/modules.test.ts`).
 7. **Content goes in data files** in `src/content/`, validated at startup, not hard-coded in rules.
+   Content stored in tile layers by position (terrain, rocks, ores) is append-only: reordering breaks saves.
 8. **Each build stage is a short series of small pull requests**, one module or feature per PR.
 
 ## Writing a module
@@ -50,7 +51,8 @@ A module is a `defineModule({...})` object (see `src/core/module.ts` and the sam
 `tests/fixtures/sampleModules.ts`):
 
 - `id`, `name`, `layer` (foundation, core, society, pressure, frontier, dark, living), `deps`
-- `init`: creates the module's state for a new game (stored in `world.modules[id]`)
+- `init`: creates the module's state for a new game (stored in `world.modules[id]`). New-game choices
+  (biome, hilliness) arrive in `world.settings[id]`.
 - `setup`: defines the module's registries and provides its services (runs on every start and load)
 - `contribute`: adds entries to other modules' registries (use `registries.find`, which returns
   undefined when the owner is off)

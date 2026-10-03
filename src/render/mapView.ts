@@ -1,5 +1,6 @@
 import { Application, Container, Sprite, Texture } from 'pixi.js';
 import type { MapSnapshot } from '../protocol';
+import { colourMap } from './mapColours';
 
 /** Screen pixels per tile at zoom 1. */
 const TILE_PX = 8;
@@ -12,6 +13,9 @@ export class MapView {
   private readonly app = new Application();
   private readonly camera = new Container();
   private mapSprite: Sprite | null = null;
+  private mapSize = { width: 0, height: 0 };
+  /** Called with the tile under the mouse, or null when the mouse leaves the map. */
+  onHover: (tile: { x: number; y: number } | null) => void = () => {};
 
   async mount(parent: HTMLElement): Promise<void> {
     await this.app.init({ resizeTo: parent, background: '#0b0d10', antialias: false });
@@ -27,20 +31,12 @@ export class MapView {
     const g = canvas.getContext('2d');
     if (!g) throw new Error('2D canvas not available');
     const image = g.createImageData(map.width, map.height);
-    for (let y = 0; y < map.height; y++) {
-      for (let x = 0; x < map.width; x++) {
-        const [r, gr, b] = placeholderColour(x, y);
-        const o = (y * map.width + x) * 4;
-        image.data[o] = r;
-        image.data[o + 1] = gr;
-        image.data[o + 2] = b;
-        image.data[o + 3] = 255;
-      }
-    }
+    image.data.set(colourMap(map));
     g.putImageData(image, 0, 0);
 
     const texture = Texture.from(canvas);
     texture.source.scaleMode = 'nearest';
+    this.mapSize = { width: map.width, height: map.height };
     this.mapSprite?.destroy();
     this.mapSprite = new Sprite(texture);
     this.mapSprite.scale.set(TILE_PX);
@@ -53,6 +49,14 @@ export class MapView {
     );
   }
 
+  private reportHover(canvas: HTMLCanvasElement, e: PointerEvent): void {
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left - this.camera.x) / (this.camera.scale.x * TILE_PX));
+    const y = Math.floor((e.clientY - rect.top - this.camera.y) / (this.camera.scale.y * TILE_PX));
+    const inside = x >= 0 && y >= 0 && x < this.mapSize.width && y < this.mapSize.height;
+    this.onHover(inside ? { x, y } : null);
+  }
+
   private enablePanZoom(canvas: HTMLCanvasElement): void {
     let dragging = false;
     let lastX = 0;
@@ -63,7 +67,9 @@ export class MapView {
       lastY = e.clientY;
     });
     window.addEventListener('pointerup', () => (dragging = false));
+    canvas.addEventListener('pointerleave', () => this.onHover(null));
     window.addEventListener('pointermove', (e) => {
+      if (e.target === canvas) this.reportHover(canvas, e);
       if (!dragging) return;
       this.camera.x += e.clientX - lastX;
       this.camera.y += e.clientY - lastY;
@@ -88,10 +94,4 @@ export class MapView {
       { passive: false },
     );
   }
-}
-
-/** Bare ground with a faint grid, until the world module draws real terrain. */
-function placeholderColour(x: number, y: number): [number, number, number] {
-  const grid = x % 10 === 0 || y % 10 === 0;
-  return grid ? [52, 48, 40] : [44, 40, 33];
 }

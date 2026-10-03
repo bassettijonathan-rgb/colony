@@ -17,6 +17,8 @@ export interface SimulationOptions {
   disabled?: readonly string[];
   width?: number;
   height?: number;
+  /** New-game settings keyed by module id, e.g. `{ 'f1-world': { biome: 'tundra' } }`. */
+  settings?: Record<string, unknown>;
 }
 
 /** Guards against two modules bouncing signals back and forth forever. */
@@ -101,7 +103,7 @@ export class Simulation {
   }
 
   static create(options: SimulationOptions): Simulation {
-    const world = createWorld(options.seed, options.width, options.height);
+    const world = createWorld(options.seed, options.width, options.height, structuredClone(options.settings ?? {}));
     return new Simulation(world, options.modules, options.disabled ?? [], true);
   }
 

@@ -6,6 +6,10 @@ export interface AppProps {
   tickMs: number;
   speed: Speed;
   modules: string[];
+  /** Biome and hilliness. */
+  summary: string;
+  /** Description of the tile under the mouse. */
+  hover: string;
   error: string | null;
   onSpeed(speed: Speed): void;
 }
@@ -29,6 +33,7 @@ export function App(props: AppProps) {
     <div class="topbar">
       <strong>Colony</strong>
       <span>seed {props.seed}</span>
+      {props.summary && <span>{props.summary}</span>}
       <span>
         tick {props.tick} ({formatTime(props.tick)})
       </span>
@@ -42,6 +47,7 @@ export function App(props: AppProps) {
       <span class="muted">{props.tickMs.toFixed(2)} ms/tick</span>
       <span class="muted">modules: {props.modules.length === 0 ? 'none yet' : props.modules.join(', ')}</span>
       {props.error && <span class="error">{props.error}</span>}
+      {props.hover && <span class="hover">{props.hover}</span>}
     </div>
   );
 }

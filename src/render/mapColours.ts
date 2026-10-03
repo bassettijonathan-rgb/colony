@@ -76,3 +76,18 @@ export function colourMap(map: MapSnapshot): Uint8ClampedArray {
   }
   return out;
 }
+
+/** White over snowy tiles: a light dusting shows faintly, 20 cm or more covers the ground. */
+export function snowOverlay(map: MapSnapshot, snowMm: ArrayLike<number>): Uint8ClampedArray {
+  const n = map.width * map.height;
+  const out = new Uint8ClampedArray(n * 4);
+  for (let i = 0; i < n; i++) {
+    const mm = snowMm[i] ?? 0;
+    if (mm === 0) continue;
+    out[i * 4] = 236;
+    out[i * 4 + 1] = 240;
+    out[i * 4 + 2] = 245;
+    out[i * 4 + 3] = Math.round(255 * Math.min(0.92, 0.25 + mm / 270));
+  }
+  return out;
+}

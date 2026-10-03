@@ -1,4 +1,4 @@
-import type { Speed } from '../protocol';
+import type { SkyStatus, Speed } from '../protocol';
 
 export interface AppProps {
   seed: number;
@@ -8,6 +8,7 @@ export interface AppProps {
   modules: string[];
   /** Biome and hilliness. */
   summary: string;
+  sky: SkyStatus | null;
   /** Description of the tile under the mouse. */
   hover: string;
   error: string | null;
@@ -20,23 +21,19 @@ const SPEEDS: { speed: Speed; label: string }[] = [
   { speed: 3, label: '3x' },
 ];
 
-/** Five in-game seconds per tick. */
-function formatTime(tick: number): string {
-  const seconds = tick * 5;
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  return `${h}h ${String(m).padStart(2, '0')}m`;
-}
-
 export function App(props: AppProps) {
   return (
     <div class="topbar">
       <strong>Colony</strong>
       <span>seed {props.seed}</span>
       {props.summary && <span>{props.summary}</span>}
-      <span>
-        tick {props.tick} ({formatTime(props.tick)})
-      </span>
+      {props.sky ? (
+        <span>
+          {props.sky.date} · {Math.round(props.sky.temperature)}°C · {props.sky.weather}
+        </span>
+      ) : (
+        <span>tick {props.tick}</span>
+      )}
       <span class="speeds">
         {SPEEDS.map((s) => (
           <button key={s.speed} class={props.speed === s.speed ? 'active' : ''} onClick={() => props.onSpeed(s.speed)}>

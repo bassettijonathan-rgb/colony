@@ -1,6 +1,6 @@
 import { Application, Container, Sprite, Texture } from 'pixi.js';
 import type { MapSnapshot } from '../protocol';
-import { colourMap } from './mapColours';
+import { colourMap, snowOverlay } from './mapColours';
 
 /** Screen pixels per tile at zoom 1. */
 const TILE_PX = 8;
@@ -13,6 +13,8 @@ export class MapView {
   private readonly app = new Application();
   private readonly camera = new Container();
   private mapSprite: Sprite | null = null;
+  private snowSprite: Sprite | null = null;
+  private readonly night = new Sprite(Texture.WHITE);
   private mapSize = { width: 0, height: 0 };
   /** Called with the tile under the mouse, or null when the mouse leaves the map. */
   onHover: (tile: { x: number; y: number } | null) => void = () => {};
@@ -25,28 +27,40 @@ export class MapView {
   }
 
   showMap(map: MapSnapshot): void {
-    const canvas = document.createElement('canvas');
-    canvas.width = map.width;
-    canvas.height = map.height;
-    const g = canvas.getContext('2d');
-    if (!g) throw new Error('2D canvas not available');
-    const image = g.createImageData(map.width, map.height);
-    image.data.set(colourMap(map));
-    g.putImageData(image, 0, 0);
-
-    const texture = Texture.from(canvas);
-    texture.source.scaleMode = 'nearest';
     this.mapSize = { width: map.width, height: map.height };
     this.mapSprite?.destroy();
-    this.mapSprite = new Sprite(texture);
-    this.mapSprite.scale.set(TILE_PX);
+    this.mapSprite = tileSprite(colourMap(map), map.width, map.height);
     this.camera.addChild(this.mapSprite);
+
+    // Night is a dark blue veil over the whole map, faded in and out by setLight.
+    this.night.tint = 0x0a1030;
+    this.night.width = map.width * TILE_PX;
+    this.night.height = map.height * TILE_PX;
+    this.night.alpha = 0;
+    this.camera.addChild(this.night);
+    this.updateLayers(map, map.layers);
 
     // Start centred on the map.
     this.camera.position.set(
       this.app.screen.width / 2 - (map.width * TILE_PX) / 2,
       this.app.screen.height / 2 - (map.height * TILE_PX) / 2,
     );
+  }
+
+  /** Redraws overlays for layers that changed. `map` holds the latest copy of every layer. */
+  updateLayers(map: MapSnapshot, changed: Record<string, ArrayLike<number>>): void {
+    const snow = changed.snow;
+    if (snow) {
+      this.snowSprite?.destroy();
+      this.snowSprite = tileSprite(snowOverlay(map, snow), map.width, map.height);
+      // Snow sits on the ground, under the night veil.
+      this.camera.addChildAt(this.snowSprite, this.camera.getChildIndex(this.night));
+    }
+  }
+
+  /** Daylight from 0 (night) to 1 (clear noon). */
+  setLight(light: number): void {
+    this.night.alpha = (1 - light) * 0.65;
   }
 
   private reportHover(canvas: HTMLCanvasElement, e: PointerEvent): void {
@@ -94,4 +108,21 @@ export class MapView {
       { passive: false },
     );
   }
+}
+
+/** A sprite showing one pixel per tile, scaled up without smoothing. */
+function tileSprite(rgba: Uint8ClampedArray, width: number, height: number): Sprite {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const g = canvas.getContext('2d');
+  if (!g) throw new Error('2D canvas not available');
+  const image = g.createImageData(width, height);
+  image.data.set(rgba);
+  g.putImageData(image, 0, 0);
+  const texture = Texture.from(canvas);
+  texture.source.scaleMode = 'nearest';
+  const sprite = new Sprite(texture);
+  sprite.scale.set(TILE_PX);
+  return sprite;
 }

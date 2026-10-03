@@ -19,6 +19,8 @@ export interface World {
   settings: Record<string, unknown>;
   /** Tile layers, one value per tile, indexed by `y * width + x`. */
   layers: Record<string, LayerArray>;
+  /** Bumped by `touchLayer` whenever a layer changes after the game starts, so the page knows to redraw it. */
+  layerVersions: Record<string, number>;
   /** Next entity id to hand out. Ids are never reused. */
   nextEntityId: EntityId;
   /** Entity ids that currently exist. */
@@ -45,6 +47,7 @@ export function createWorld(
     height,
     settings,
     layers: {},
+    layerVersions: {},
     nextEntityId: 1,
     entities: new Map(),
     components: {},
@@ -92,4 +95,9 @@ export function spawnEntity(world: World): EntityId {
 export function despawnEntity(world: World, id: EntityId): void {
   world.entities.delete(id);
   for (const name of Object.keys(world.components).sort()) world.components[name]?.delete(id);
+}
+
+/** Marks a tile layer as changed so the page redraws it. */
+export function touchLayer(world: World, name: string): void {
+  world.layerVersions[name] = (world.layerVersions[name] ?? 0) + 1;
 }

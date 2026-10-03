@@ -17,7 +17,24 @@ export interface MapSnapshot {
   layers: Record<string, ArrayLike<number>>;
 }
 
+/** What the top bar shows about the sky. */
+export interface SkyStatus {
+  /** e.g. "Year 1, Spring 3, 07:40" */
+  date: string;
+  temperature: number;
+  weather: string;
+  /** 0 (night) to 1 (clear noon). */
+  light: number;
+}
+
 export type FromWorker =
   | { type: 'started'; seed: number; modules: string[]; map: MapSnapshot; summary: string }
-  | { type: 'tick'; tick: number; tickMs: number }
+  | {
+      type: 'tick';
+      tick: number;
+      tickMs: number;
+      sky: SkyStatus;
+      /** Tile layers that changed since the last message, if any. */
+      layers?: Record<string, ArrayLike<number>>;
+    }
   | { type: 'error'; message: string };

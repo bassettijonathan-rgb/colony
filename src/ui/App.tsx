@@ -1,5 +1,6 @@
-import type { ColonistView, SkyStatus, Speed } from '../protocol';
+import type { ColonistView, SkyStatus, Speed, WorkStatus } from '../protocol';
 import { ColonistList, Inspector } from './Inspector';
+import { Toolbar, WorkPanel, type Tool } from './Work';
 
 export interface AppProps {
   seed: number;
@@ -15,8 +16,15 @@ export interface AppProps {
   error: string | null;
   colonists: ColonistView[];
   selected: number | null;
+  /** Null when the work module is off. */
+  work: WorkStatus | null;
+  tool: Tool | null;
+  showWork: boolean;
   onSpeed(speed: Speed): void;
   onSelect(id: number | null): void;
+  onTool(tool: Tool | null): void;
+  onToggleWork(): void;
+  onPriority(id: number, workType: string, priority: number): void;
 }
 
 const SPEEDS: { speed: Speed; label: string }[] = [
@@ -32,6 +40,12 @@ export function App(props: AppProps) {
       <TopBar {...props} />
       {props.colonists.length > 0 && <ColonistList colonists={props.colonists} selected={props.selected} onSelect={props.onSelect} />}
       {selected && <Inspector colonist={selected} onClose={() => props.onSelect(null)} />}
+      {props.work && (
+        <Toolbar tool={props.tool} showWork={props.showWork} jobs={props.work.jobs} onTool={props.onTool} onToggleWork={props.onToggleWork} />
+      )}
+      {props.work && props.showWork && (
+        <WorkPanel work={props.work} colonists={props.colonists} onPriority={props.onPriority} onClose={props.onToggleWork} />
+      )}
     </>
   );
 }

@@ -1,6 +1,7 @@
 import { ORES } from '../content/ores';
 import { ROCKS } from '../content/rocks';
 import { TERRAIN } from '../content/terrain';
+import { DESIGNATION } from '../modules/c1-work/api';
 import { LAYER, ROOF } from '../modules/f1-world/api';
 import type { MapSnapshot } from '../protocol';
 
@@ -66,6 +67,8 @@ export function colourMap(map: MapSnapshot): Uint8ClampedArray {
         rgb = terrainRgb[terrain[i] ?? 0] ?? [255, 0, 255];
         // Higher ground slightly lighter.
         rgb = shade(rgb, ((elevation?.[i] ?? 128) / 255 - 0.5) * 0.15);
+        // Dug-out ground still under a rock roof is darker, so caves read as caves.
+        if ((roof?.[i] ?? 0) === ROOF.rock || roof?.[i] === ROOF.overhead) rgb = shade(rgb, -0.3);
       }
       rgb = shade(rgb, speckle(i));
     }
@@ -88,6 +91,21 @@ export function snowOverlay(map: MapSnapshot, snowMm: ArrayLike<number>): Uint8C
     out[i * 4 + 1] = 240;
     out[i * 4 + 2] = 245;
     out[i * 4 + 3] = Math.round(255 * Math.min(0.92, 0.25 + mm / 270));
+  }
+  return out;
+}
+
+/** Tiles the player has marked for work, as a translucent overlay. Transparent where unmarked. */
+export function designationOverlay(map: MapSnapshot, marks: ArrayLike<number>): Uint8ClampedArray {
+  const out = new Uint8ClampedArray(map.width * map.height * 4);
+  for (let i = 0; i < marks.length; i++) {
+    if (marks[i] === DESIGNATION.mine) {
+      // A checker of two ambers, so marked rock reads as "to dig" and still shows the rock underneath.
+      const x = i % map.width;
+      const y = (i - x) / map.width;
+      const light = (x + y) % 2 === 0;
+      out.set(light ? [255, 196, 64, 150] : [230, 160, 40, 110], i * 4);
+    }
   }
   return out;
 }

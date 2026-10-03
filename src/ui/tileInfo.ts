@@ -1,6 +1,7 @@
 import { ORES } from '../content/ores';
 import { ROCKS } from '../content/rocks';
 import { TERRAIN } from '../content/terrain';
+import { DESIGNATION, DESIGNATION_LAYER } from '../modules/c1-work/api';
 import { LAYER, ROOF } from '../modules/f1-world/api';
 import type { MapSnapshot } from '../protocol';
 
@@ -21,9 +22,11 @@ export function describeTile(map: MapSnapshot, x: number, y: number): string {
     parts.push(ground?.name ?? '?');
     const fertility = map.layers[LAYER.fertility]?.[i] ?? 0;
     if (fertility > 0) parts.push(`fertility ${fertility}%`);
+    if (roof === ROOF.rock || roof === ROOF.overhead) parts.push('under a rock roof');
     if (ground && ground.moveCost === 0) parts.push('impassable');
     else if (ground && ground.moveCost > 1) parts.push(`slow going (x${ground.moveCost})`);
   }
+  if (map.layers[DESIGNATION_LAYER]?.[i] === DESIGNATION.mine) parts.push('marked for mining');
   const snowMm = map.layers.snow?.[i] ?? 0;
   if (snowMm > 0) parts.push(`snow ${Math.max(1, Math.round(snowMm / 10))} cm`);
   return `${x}, ${y}: ${parts.join(', ')}`;

@@ -67,6 +67,9 @@ A module is a `defineModule({...})` object (see `src/core/module.ts` and the sam
 A module that changes a tile layer after the game starts calls `touchLayer(world, name)` so the page
 redraws it.
 
+To give colonists work, post jobs to the `workBoard` service (`c1-work`) with a work type from
+`src/content/work.ts`, and apply the result when your module hears `job-done` for a job it owns.
+
 One tick is 5 in-game seconds; 1x speed is 10 ticks per real second. A Verity day is 26 hours, a season 15 days, a year
 60 days (constants in `src/modules/f2-time/api.ts`).
 

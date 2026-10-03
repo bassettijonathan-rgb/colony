@@ -13,6 +13,15 @@ export type ToWorker =
   | { type: 'speed'; speed: Speed }
   | { type: 'command'; command: { type: string; payload: unknown } };
 
+/** The work types colonists can be given priorities for, and everyone's priorities. */
+export interface WorkStatus {
+  types: { id: string; name: string; skill: string }[];
+  /** Colonist id to work type id to priority (0 = never, 1 = first ... 4 = last). */
+  priorities: Record<number, Record<string, number>>;
+  /** Jobs waiting or under way. */
+  jobs: number;
+}
+
 export interface MapSnapshot {
   width: number;
   height: number;
@@ -31,13 +40,24 @@ export interface SkyStatus {
 }
 
 export type FromWorker =
-  | { type: 'started'; seed: number; modules: string[]; map: MapSnapshot; summary: string; colonists: ColonistView[]; home: { x: number; y: number } }
+  | {
+      type: 'started';
+      seed: number;
+      modules: string[];
+      map: MapSnapshot;
+      summary: string;
+      colonists: ColonistView[];
+      home: { x: number; y: number };
+      /** Null when the work module is off. */
+      work: WorkStatus | null;
+    }
   | {
       type: 'tick';
       tick: number;
       tickMs: number;
       sky: SkyStatus;
       colonists: ColonistView[];
+      work: WorkStatus | null;
       /** Tile layers that changed since the last message, if any. */
       layers?: Record<string, ArrayLike<number>>;
     }

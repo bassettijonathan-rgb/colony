@@ -15,6 +15,9 @@ import {
 } from '../src/modules/f2-time';
 import { baseTemperature, calendarAt, dayLength, sunlight } from '../src/modules/f2-time/sky';
 
+/** These tests are about time and weather; colonists would only slow them down. */
+const OFF = ['f3-people'];
+
 const temperate = (BIOMES.find((b) => b.id === 'temperate-forest') as (typeof BIOMES)[number]).climate;
 
 function newGame(seed: number, opts: { biome?: string; season?: Season; hour?: number; size?: number } = {}): Simulation {
@@ -22,6 +25,7 @@ function newGame(seed: number, opts: { biome?: string; season?: Season; hour?: n
   return Simulation.create({
     seed,
     modules: ALL_MODULES,
+    disabled: OFF,
     width: size,
     height: size,
     settings: {
@@ -69,6 +73,7 @@ describe('calendar', () => {
     const game = Simulation.create({
       seed: 2,
       modules: [...ALL_MODULES, listener],
+      disabled: OFF,
       width: 32,
       height: 32,
       settings: { 'f2-time': { startHour: 0 } },
@@ -185,6 +190,7 @@ describe('weather', () => {
       const sim = Simulation.create({
         seed,
         modules: [...ALL_MODULES, listener],
+        disabled: OFF,
         width: 24,
         height: 24,
         settings: { 'f2-time': { startSeason: 'winter' } },

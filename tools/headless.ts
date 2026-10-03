@@ -5,6 +5,7 @@
  *   npm run sim -- --seed 42 --ticks 500 --off c3-climate
  *   npm run sim -- --seed 7 --biome tundra --hills mountainous --map
  *   npm run sim -- --seed 7 --days 60 --climate   # one line per day: temperatures, weather, snow
+ *   npm run sim -- --seed 7 --days 2 --colonists 200   # speed check with a big colony
  */
 import { parseArgs } from 'node:util';
 import { performance } from 'node:perf_hooks';
@@ -12,6 +13,7 @@ import { Simulation } from '../src/core';
 import { ALL_MODULES } from '../src/modules';
 import { worldMap, type WorldSettings } from '../src/modules/f1-world';
 import { clock, TICKS_PER_DAY, TICKS_PER_HOUR, type TimeSettings } from '../src/modules/f2-time';
+import { people, type PeopleSettings } from '../src/modules/f3-people';
 
 const { values } = parseArgs({
   options: {
@@ -25,6 +27,7 @@ const { values } = parseArgs({
     map: { type: 'boolean', default: false },
     season: { type: 'string' },
     climate: { type: 'boolean', default: false },
+    colonists: { type: 'string' },
   },
 });
 
@@ -43,12 +46,15 @@ if (values.river) world.river = values.river === 'yes';
 const time: TimeSettings = {};
 if (values.season) time.startSeason = values.season as NonNullable<TimeSettings['startSeason']>;
 
+const crew: PeopleSettings = {};
+if (values.colonists) crew.colonists = Number(values.colonists);
+
 const tStart = performance.now();
 const sim = Simulation.create({
   seed,
   modules: ALL_MODULES,
   disabled: values.off,
-  settings: { 'f1-world': world, 'f2-time': time },
+  settings: { 'f1-world': world, 'f2-time': time, 'f3-people': crew },
 });
 const startMs = performance.now() - tStart;
 const hasTime = sim.modules.some((m) => m.id === 'f2-time');
@@ -127,4 +133,20 @@ if (sim.modules.some((m) => m.id === 'f1-world')) {
       console.log(line);
     }
   }
+}
+
+if (sim.modules.some((m) => m.id === 'f3-people')) {
+  const crewService = sim.services.get(people);
+  const ids = crewService.ids();
+  const home = crewService.home();
+  console.log(`colonists   ${ids.length}, landed at ${home.x}, ${home.y}`);
+  for (const id of ids.slice(0, 20)) {
+    const c = crewService.get(id);
+    if (!c) continue;
+    const best = Object.entries(c.person.skills).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([k, v]) => `${k} ${v}`).join(', ');
+    console.log(
+      `  ${c.person.name.padEnd(22)} ${String(c.person.age).padStart(2)}  food ${(c.needs.food * 100).toFixed(0).padStart(3)}%  rest ${(c.needs.rest * 100).toFixed(0).padStart(3)}%  rations ${c.needs.rations}  ${c.activity.padEnd(6)}  ${best}`,
+    );
+  }
+  if (ids.length > 20) console.log(`  ... and ${ids.length - 20} more`);
 }

@@ -1,4 +1,5 @@
-import type { SkyStatus, Speed } from '../protocol';
+import type { ColonistView, SkyStatus, Speed } from '../protocol';
+import { ColonistList, Inspector } from './Inspector';
 
 export interface AppProps {
   seed: number;
@@ -12,7 +13,10 @@ export interface AppProps {
   /** Description of the tile under the mouse. */
   hover: string;
   error: string | null;
+  colonists: ColonistView[];
+  selected: number | null;
   onSpeed(speed: Speed): void;
+  onSelect(id: number | null): void;
 }
 
 const SPEEDS: { speed: Speed; label: string }[] = [
@@ -22,6 +26,17 @@ const SPEEDS: { speed: Speed; label: string }[] = [
 ];
 
 export function App(props: AppProps) {
+  const selected = props.colonists.find((c) => c.id === props.selected);
+  return (
+    <>
+      <TopBar {...props} />
+      {props.colonists.length > 0 && <ColonistList colonists={props.colonists} selected={props.selected} onSelect={props.onSelect} />}
+      {selected && <Inspector colonist={selected} onClose={() => props.onSelect(null)} />}
+    </>
+  );
+}
+
+function TopBar(props: AppProps) {
   return (
     <div class="topbar">
       <strong>Colony</strong>

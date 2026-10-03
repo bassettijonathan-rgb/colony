@@ -15,6 +15,8 @@ export interface World {
   rng: RngState;
   width: number;
   height: number;
+  /** New-game settings, keyed by module id (e.g. the world module's biome). Never changed after start. */
+  settings: Record<string, unknown>;
   /** Tile layers, one value per tile, indexed by `y * width + x`. */
   layers: Record<string, LayerArray>;
   /** Next entity id to hand out. Ids are never reused. */
@@ -29,13 +31,19 @@ export interface World {
 
 export const DEFAULT_MAP_SIZE = 250;
 
-export function createWorld(seed: number, width = DEFAULT_MAP_SIZE, height = DEFAULT_MAP_SIZE): World {
+export function createWorld(
+  seed: number,
+  width = DEFAULT_MAP_SIZE,
+  height = DEFAULT_MAP_SIZE,
+  settings: Record<string, unknown> = {},
+): World {
   return {
     seed,
     tick: 0,
     rng: seedRng(seed),
     width,
     height,
+    settings,
     layers: {},
     nextEntityId: 1,
     entities: new Map(),

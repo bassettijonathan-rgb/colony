@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 import { Simulation, type Command } from './core';
 import { ALL_MODULES } from './modules';
+import { worldMap } from './modules/f1-world/api';
 import { TICKS_PER_SECOND, type FromWorker, type Speed, type ToWorker } from './protocol';
 
 /**
@@ -35,7 +36,8 @@ self.onmessage = (event: MessageEvent<ToWorker>) => {
   try {
     switch (msg.type) {
       case 'start': {
-        sim = Simulation.create({ seed: msg.seed, modules: ALL_MODULES });
+        sim = Simulation.create({ seed: msg.seed, modules: ALL_MODULES, settings: msg.settings });
+        const map = sim.services.get(worldMap);
         const layers: Record<string, ArrayLike<number>> = {};
         for (const [name, layer] of Object.entries(sim.world.layers)) layers[name] = layer.slice();
         post({
@@ -43,6 +45,7 @@ self.onmessage = (event: MessageEvent<ToWorker>) => {
           seed: msg.seed,
           modules: sim.modules.map((m) => m.id),
           map: { width: sim.world.width, height: sim.world.height, layers },
+          summary: map.biome().name + ', ' + map.hilliness().replace('-', ' '),
         });
         timer ??= setInterval(frame, FRAME_MS);
         break;

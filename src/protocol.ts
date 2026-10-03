@@ -6,7 +6,7 @@ export type Speed = 0 | 1 | 3;
 export const TICKS_PER_SECOND: Record<Speed, number> = { 0: 0, 1: 10, 3: 30 };
 
 export type ToWorker =
-  | { type: 'start'; seed: number }
+  | { type: 'start'; seed: number; settings: Record<string, unknown> }
   | { type: 'speed'; speed: Speed }
   | { type: 'command'; command: { type: string; payload: unknown } };
 
@@ -18,6 +18,6 @@ export interface MapSnapshot {
 }
 
 export type FromWorker =
-  | { type: 'started'; seed: number; modules: string[]; map: MapSnapshot }
+  | { type: 'started'; seed: number; modules: string[]; map: MapSnapshot; summary: string }
   | { type: 'tick'; tick: number; tickMs: number }
   | { type: 'error'; message: string };

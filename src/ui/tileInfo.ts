@@ -5,6 +5,7 @@ import { ROCKS } from '../content/rocks';
 import { TERRAIN } from '../content/terrain';
 import { DESIGNATION, DESIGNATION_LAYER } from '../modules/c1-work/api';
 import { CONSTRUCTION_LAYER } from '../modules/c2-construction/api';
+import { ROOM_LAYER } from '../modules/c2-rooms/api';
 import { LAYER, ROOF } from '../modules/f1-world/api';
 import type { MapSnapshot } from '../protocol';
 
@@ -36,7 +37,24 @@ export function describeTile(map: MapSnapshot, x: number, y: number): string {
   if (plan) parts.push(`${plan.name.toLowerCase()} planned`);
   const item = ITEMS[(map.layers[CONSTRUCTION_LAYER.item]?.[i] ?? 0) - 1];
   if (item) parts.push(`${item.name} x${map.layers[CONSTRUCTION_LAYER.itemCount]?.[i] ?? 0}`);
+  const room = map.layers[ROOM_LAYER]?.[i] ?? 0;
+  if (room >= 2) parts.push(describeRoom(map, room));
   const snowMm = map.layers.snow?.[i] ?? 0;
   if (snowMm > 0) parts.push(`snow ${Math.max(1, Math.round(snowMm / 10))} cm`);
   return `${x}, ${y}: ${parts.join(', ')}`;
+}
+
+/** "in a room of 9 tiles, roofed" */
+function describeRoom(map: MapSnapshot, id: number): string {
+  const ids = map.layers[ROOM_LAYER] as ArrayLike<number>;
+  const roofs = map.layers[LAYER.roof];
+  let size = 0;
+  let roofed = 0;
+  for (let i = 0; i < ids.length; i++) {
+    if (ids[i] !== id) continue;
+    size++;
+    if ((roofs?.[i] ?? 0) !== ROOF.none) roofed++;
+  }
+  const cover = roofed === size ? 'roofed' : roofed === 0 ? 'open to the sky' : `${Math.round((roofed / size) * 100)}% roofed`;
+  return `in a room of ${size} tile${size === 1 ? '' : 's'}, ${cover}`;
 }

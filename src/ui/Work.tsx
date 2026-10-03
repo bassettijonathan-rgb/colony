@@ -26,13 +26,15 @@ export function toolForKey(key: string): Tool | null {
   return TOOLS.find((t) => t.key.toLowerCase() === key)?.tool ?? null;
 }
 
-/** Bottom bar: area tools and the work priorities toggle. */
+/** Bottom bar: area tools, the work priorities toggle and the rooms view. */
 export function Toolbar(props: {
   tool: Tool | null;
   showWork: boolean;
+  showRooms: boolean;
   jobs: number;
   onTool(tool: Tool | null): void;
   onToggleWork(): void;
+  onToggleRooms(): void;
 }) {
   const active = TOOLS.find((t) => t.tool === props.tool);
   return (
@@ -44,6 +46,9 @@ export function Toolbar(props: {
       ))}
       <button class={props.showWork ? 'active' : ''} onClick={props.onToggleWork}>
         Work <span class="key">P</span>
+      </button>
+      <button class={props.showRooms ? 'active' : ''} title="Show rooms closed off by walls, doors and rock" onClick={props.onToggleRooms}>
+        Rooms <span class="key">R</span>
       </button>
       <span class="muted">{active ? `${active.hint}. Esc or right-click to stop.` : `${props.jobs} job${props.jobs === 1 ? '' : 's'} waiting or under way`}</span>
     </div>

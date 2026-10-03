@@ -3,7 +3,7 @@ import { BIOMES, HILLINESS, type BiomeDef, type Hilliness } from '../../content/
 import { ORES } from '../../content/ores';
 import { ROCKS } from '../../content/rocks';
 import { TERRAIN, type TerrainDef } from '../../content/terrain';
-import { LAYER, TILE_RULES, WORLD_MODULE_ID, worldMap, type TileRule, type WorldSettings, type WorldState } from './api';
+import { LAYER, ROOF, TILE_RULES, WORLD_MODULE_ID, worldMap, type TileRule, type WorldSettings, type WorldState } from './api';
 import { validateWorldContent } from './content';
 import { generateMap } from './generate';
 
@@ -100,6 +100,15 @@ export const worldModule = defineModule<WorldState>({
         touchLayer(world, LAYER.rock);
         if (ore) touchLayer(world, LAYER.ore);
         return { rock, ore };
+      },
+      buildRoof: (x, y) => {
+        if (!inBounds(world, x, y) || hasRock(x, y)) return false;
+        const roofs = layer(LAYER.roof);
+        const i = at(x, y);
+        if (roofs[i] !== ROOF.none) return false;
+        roofs[i] = ROOF.constructed;
+        touchLayer(world, LAYER.roof);
+        return true;
       },
     });
   },

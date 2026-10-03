@@ -25,7 +25,7 @@ if (params.get('river')) world.river = params.get('river') === 'yes';
 const time: Record<string, unknown> = {};
 if (params.get('season')) time.startSeason = params.get('season');
 
-const state: Omit<AppProps, 'onSpeed' | 'onSelect' | 'onTool' | 'onToggleWork' | 'onPriority'> = {
+const state: Omit<AppProps, 'onSpeed' | 'onSelect' | 'onTool' | 'onToggleWork' | 'onToggleRooms' | 'onPriority'> = {
   seed,
   tick: 0,
   tickMs: 0,
@@ -41,6 +41,7 @@ const state: Omit<AppProps, 'onSpeed' | 'onSelect' | 'onTool' | 'onToggleWork' |
   stock: {},
   tool: null,
   showWork: false,
+  showRooms: false,
 };
 /** Box colour for each area tool. */
 const toolColour = (tool: Tool): number => (tool === 'mine' ? 0xffc040 : tool === 'cancel' ? 0xe07a6a : 0x7fb0e0);
@@ -67,6 +68,7 @@ function redraw(): void {
       },
       onSelect: select,
       onTool: setTool,
+      onToggleRooms: toggleRooms,
       onToggleWork: () => {
         state.showWork = !state.showWork;
         redraw();
@@ -81,6 +83,12 @@ function redraw(): void {
     }),
     uiEl,
   );
+}
+
+function toggleRooms(): void {
+  state.showRooms = !state.showRooms;
+  view.showRooms(state.showRooms);
+  redraw();
 }
 
 function setTool(tool: Tool | null): void {
@@ -137,6 +145,7 @@ window.addEventListener('keydown', (e) => {
     const tool = toolForKey(key);
     setTool(state.tool === tool ? null : tool);
   }
+  else if (key === 'r') toggleRooms();
   else if (key === 'p') {
     state.showWork = !state.showWork;
     redraw();

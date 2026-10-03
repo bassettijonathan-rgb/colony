@@ -23,10 +23,12 @@ export interface AppProps {
   stock: Record<string, number>;
   tool: Tool | null;
   showWork: boolean;
+  showRooms: boolean;
   onSpeed(speed: Speed): void;
   onSelect(id: number | null): void;
   onTool(tool: Tool | null): void;
   onToggleWork(): void;
+  onToggleRooms(): void;
   onPriority(id: number, workType: string, priority: number): void;
 }
 
@@ -44,7 +46,15 @@ export function App(props: AppProps) {
       {props.colonists.length > 0 && <ColonistList colonists={props.colonists} selected={props.selected} onSelect={props.onSelect} />}
       {selected && <Inspector colonist={selected} onClose={() => props.onSelect(null)} />}
       {props.work && (
-        <Toolbar tool={props.tool} showWork={props.showWork} jobs={props.work.jobs} onTool={props.onTool} onToggleWork={props.onToggleWork} />
+        <Toolbar
+          tool={props.tool}
+          showWork={props.showWork}
+          showRooms={props.showRooms}
+          jobs={props.work.jobs}
+          onTool={props.onTool}
+          onToggleWork={props.onToggleWork}
+          onToggleRooms={props.onToggleRooms}
+        />
       )}
       {props.work && props.showWork && (
         <WorkPanel work={props.work} colonists={props.colonists} onPriority={props.onPriority} onClose={props.onToggleWork} />

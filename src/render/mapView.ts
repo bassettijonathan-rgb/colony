@@ -1,6 +1,6 @@
 import { Application, Container, Graphics, Sprite, Texture } from 'pixi.js';
 import type { MapSnapshot } from '../protocol';
-import { colourMap, designationOverlay, snowOverlay } from './mapColours';
+import { blueprintOverlay, buildingOverlay, colourMap, designationOverlay, drawItems, snowOverlay } from './mapColours';
 import { PawnLayer, type PawnDraw } from './pawnLayer';
 
 /** Screen pixels per tile at zoom 1. */
@@ -14,8 +14,17 @@ export class MapView {
   private readonly app = new Application();
   private readonly camera = new Container();
   private mapSprite: Sprite | null = null;
-  private snowSprite: Sprite | null = null;
-  private marksSprite: Sprite | null = null;
+  /**
+   * One slot per overlay, in drawing order. Ground things sit under the night
+   * veil; the player's marks and plans stay bright above it.
+   */
+  private readonly slots = {
+    snow: new Container(),
+    building: new Container(),
+    items: new Container(),
+    designation: new Container(),
+    blueprint: new Container(),
+  };
   /** Rectangle being dragged out with an area tool. */
   private readonly areaBox = new Graphics();
   /** When set, left-drag marks out an area instead of panning; the colour is the box outline. */
@@ -60,6 +69,7 @@ export class MapView {
     this.mapSprite?.destroy();
     this.mapSprite = tileSprite(colourMap(map), map.width, map.height);
     this.camera.addChild(this.mapSprite);
+    this.camera.addChild(this.slots.snow, this.slots.building, this.slots.items);
 
     // Night is a dark blue veil over the whole map, faded in and out by setLight.
     this.night.tint = 0x0a1030;
@@ -68,6 +78,7 @@ export class MapView {
     this.night.alpha = 0;
     this.camera.addChild(this.night);
     // Colonists and the player's marks stay visible above the night veil.
+    this.camera.addChild(this.slots.designation, this.slots.blueprint);
     this.camera.addChild(this.pawns);
     this.camera.addChild(this.areaBox);
     this.updateLayers(map, map.layers);
@@ -84,19 +95,22 @@ export class MapView {
       this.mapSprite = tileSprite(colourMap(map), map.width, map.height);
       this.camera.addChildAt(this.mapSprite, index);
     }
-    const marks = changed.designation;
-    if (marks) {
-      this.marksSprite?.destroy();
-      this.marksSprite = tileSprite(designationOverlay(map, marks), map.width, map.height);
-      this.camera.addChildAt(this.marksSprite, this.camera.getChildIndex(this.pawns));
+    const { width, height } = map;
+    if (changed.designation) this.fill('designation', tileSprite(designationOverlay(map, changed.designation), width, height));
+    if (changed.snow) this.fill('snow', tileSprite(snowOverlay(map, changed.snow), width, height));
+    if (changed.building) this.fill('building', tileSprite(buildingOverlay(map, changed.building), width, height));
+    if (changed.blueprint) this.fill('blueprint', tileSprite(blueprintOverlay(map, changed.blueprint), width, height));
+    if (changed.item || changed['item-count']) {
+      const g = new Graphics();
+      drawItems(g, map, TILE_PX);
+      this.fill('items', g);
     }
-    const snow = changed.snow;
-    if (snow) {
-      this.snowSprite?.destroy();
-      this.snowSprite = tileSprite(snowOverlay(map, snow), map.width, map.height);
-      // Snow sits on the ground, under the night veil.
-      this.camera.addChildAt(this.snowSprite, this.camera.getChildIndex(this.night));
-    }
+  }
+
+  /** Replaces what an overlay slot shows. */
+  private fill(slot: keyof typeof this.slots, content: Container): void {
+    for (const old of this.slots[slot].removeChildren()) old.destroy();
+    this.slots[slot].addChild(content);
   }
 
   /** Daylight from 0 (night) to 1 (clear noon). */

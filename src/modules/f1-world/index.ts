@@ -3,7 +3,7 @@ import { BIOMES, HILLINESS, type BiomeDef, type Hilliness } from '../../content/
 import { ORES } from '../../content/ores';
 import { ROCKS } from '../../content/rocks';
 import { TERRAIN, type TerrainDef } from '../../content/terrain';
-import { LAYER, WORLD_MODULE_ID, worldMap, type WorldSettings, type WorldState } from './api';
+import { LAYER, TILE_RULES, WORLD_MODULE_ID, worldMap, type TileRule, type WorldSettings, type WorldState } from './api';
 import { validateWorldContent } from './content';
 import { generateMap } from './generate';
 
@@ -59,6 +59,23 @@ export const worldModule = defineModule<WorldState>({
     const at = (x: number, y: number): number => y * world.width + x;
     const terrainAt = (x: number, y: number): TerrainDef => TERRAIN[layer(LAYER.terrain)[at(x, y)] ?? 0] as TerrainDef;
     const hasRock = (x: number, y: number): boolean => layer(LAYER.rock)[at(x, y)] !== 0;
+    // Rules other modules add (walls, doors). Re-read only when the registry grows.
+    const registry = ctx.registries.define(TILE_RULES);
+    let rules: TileRule[] = [];
+    const currentRules = (): TileRule[] => {
+      if (rules.length !== registry.size) rules = registry.all().map(([, rule]) => rule);
+      return rules;
+    };
+    const moveCost = (x: number, y: number): number => {
+      if (!inBounds(world, x, y) || hasRock(x, y)) return 0;
+      let cost = terrainAt(x, y).moveCost;
+      for (const rule of currentRules()) {
+        if (cost === 0) break;
+        const extra = rule.moveCost?.(x, y);
+        if (extra !== undefined) cost *= extra;
+      }
+      return cost;
+    };
 
     ctx.services.provide(worldMap, {
       biome: () => biome,
@@ -68,9 +85,10 @@ export const worldModule = defineModule<WorldState>({
       oreAt: (x, y) => ORES[(layer(LAYER.ore)[at(x, y)] ?? 0) - 1] ?? null,
       roofAt: (x, y) => layer(LAYER.roof)[at(x, y)] ?? 0,
       fertilityAt: (x, y) => (layer(LAYER.fertility)[at(x, y)] ?? 0) / 100,
-      moveCost: (x, y) => (!inBounds(world, x, y) || hasRock(x, y) ? 0 : terrainAt(x, y).moveCost),
-      isWalkable: (x, y) => inBounds(world, x, y) && !hasRock(x, y) && terrainAt(x, y).moveCost > 0,
-      isBuildable: (x, y) => inBounds(world, x, y) && !hasRock(x, y) && terrainAt(x, y).buildable,
+      moveCost,
+      isWalkable: (x, y) => moveCost(x, y) > 0,
+      isBuildable: (x, y) =>
+        inBounds(world, x, y) && !hasRock(x, y) && terrainAt(x, y).buildable && currentRules().every((r) => r.buildable?.(x, y) !== false),
       mineRock: (x, y) => {
         if (!inBounds(world, x, y)) return null;
         const i = at(x, y);

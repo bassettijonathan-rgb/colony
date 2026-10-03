@@ -5,6 +5,7 @@ import { worldMap } from './modules/f1-world/api';
 import { clock } from './modules/f2-time/api';
 import { WORK_TYPES } from './content/work';
 import { WORK_MODULE_ID, workBoard } from './modules/c1-work/api';
+import { stock } from './modules/c2-construction/api';
 import { people, type ColonistView } from './modules/f3-people/api';
 import { TICKS_PER_SECOND, type FromWorker, type SkyStatus, type Speed, type ToWorker, type WorkStatus } from './protocol';
 
@@ -49,7 +50,7 @@ function workStatus(sim: Simulation): WorkStatus | null {
   for (const id of sim.services.get(people).ids()) {
     priorities[id] = Object.fromEntries(WORK_TYPES.map((w) => [w.id, board.priorityOf(id, w.id)]));
   }
-  return { types: WORK_TYPES.map(({ id, name, skill }) => ({ id, name, skill })), priorities, jobs: board.jobs().length };
+  return { types: [...WORK_TYPES].sort((a, b) => a.order - b.order).map(({ id, name, skill }) => ({ id, name, skill })), priorities, jobs: board.jobs().length };
 }
 
 function changedLayers(sim: Simulation): Record<string, ArrayLike<number>> | undefined {
@@ -88,6 +89,7 @@ function frame(): void {
     sky: skyStatus(sim),
     colonists: colonists(sim),
     work: workStatus(sim),
+    stock: sim.services.get(stock).totals(),
     ...(layers ? { layers } : {}),
   });
 }

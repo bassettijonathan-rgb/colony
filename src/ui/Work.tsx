@@ -1,11 +1,30 @@
+import { BUILDINGS } from '../content/buildings';
 import type { ColonistView, WorkStatus } from '../protocol';
 
-export type Tool = 'mine' | 'cancel';
+/** Area tools: mine, cancel, or build one of the buildings (`build:<id>`). */
+export type Tool = 'mine' | 'cancel' | `build:${string}`;
 
-const TOOLS: { tool: Tool; label: string; key: string; hint: string }[] = [
+interface ToolInfo {
+  tool: Tool;
+  label: string;
+  key: string;
+  hint: string;
+}
+
+const TOOLS: ToolInfo[] = [
   { tool: 'mine', label: 'Mine', key: 'M', hint: 'Drag over rock to mark it for mining' },
-  { tool: 'cancel', label: 'Cancel', key: 'X', hint: 'Drag to remove marks' },
+  ...BUILDINGS.map((b, k): ToolInfo => {
+    const cost = b.cost.map((c) => `${c.count} ${c.tag}`).join(' and ');
+    const shape = b.drag === 'outline' ? 'drag a box and walls go round its edge' : 'click or drag to place';
+    return { tool: `build:${b.id}`, label: b.name, key: String(k + 1), hint: `${b.name}: ${cost} each; ${shape}` };
+  }),
+  { tool: 'cancel', label: 'Cancel', key: 'X', hint: 'Drag to remove mining marks and blueprints' },
 ];
+
+/** The tool a key picks, if any. */
+export function toolForKey(key: string): Tool | null {
+  return TOOLS.find((t) => t.key.toLowerCase() === key)?.tool ?? null;
+}
 
 /** Bottom bar: area tools and the work priorities toggle. */
 export function Toolbar(props: {
@@ -65,12 +84,12 @@ export function WorkPanel(props: {
               <td class="who">{c.person.name}</td>
               {props.work.types.map((t) => {
                 const p = props.work.priorities[c.id]?.[t.id] ?? 3;
-                const skill = c.person.skills[t.skill] ?? 0;
+                const skill = t.skill ? (c.person.skills[t.skill] ?? 0) : null;
                 return (
                   <td key={t.id}>
                     <button
                       class={`prio p${p}`}
-                      title={`${c.person.name}: ${t.name} skill ${skill}. Click to raise, right-click to lower.`}
+                      title={`${c.person.name}: ${t.name}${skill === null ? '' : ` skill ${skill}`}. Click to raise, right-click to lower.`}
                       onClick={() => props.onPriority(c.id, t.id, next(p))}
                       onContextMenu={(e) => {
                         e.preventDefault();

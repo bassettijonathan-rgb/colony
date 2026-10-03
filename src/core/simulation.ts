@@ -64,12 +64,6 @@ export class Simulation {
       isEnabled: (id) => this.enabledIds.has(id),
     };
 
-    if (fresh) {
-      for (const m of this.modules) {
-        world.modules[m.id] = m.init ? m.init(this.ctx) : null;
-      }
-    }
-
     for (const m of this.modules) {
       const ctx = this.ctx;
       this.moduleCtx.set(m.id, {
@@ -89,7 +83,12 @@ export class Simulation {
         return world.modules[m.id];
       },
     });
-    for (const m of this.modules) m.setup?.(setupCtx(m));
+    // Each module starts and then sets up before the next one starts, so a module's
+    // init can already use the services of the modules it comes after.
+    for (const m of this.modules) {
+      if (fresh) world.modules[m.id] = m.init ? m.init(this.ctx) : null;
+      m.setup?.(setupCtx(m));
+    }
     for (const m of this.modules) m.contribute?.(setupCtx(m));
 
     this.systemsByPhase = new Map(PHASES.map((p) => [p, []]));
@@ -107,8 +106,8 @@ export class Simulation {
     return new Simulation(world, options.modules, options.disabled ?? [], true);
   }
 
-  /** Restores a saved game. The same module list must be passed in. */
-  static load(save: SaveFile, modules: readonly AnyModule[], disabled: readonly string[] = []): Simulation {
+  /** Restores a saved game. The same module list must be passed in; switched-off modules stay off. */
+  static load(save: SaveFile, modules: readonly AnyModule[], disabled: readonly string[] = save.disabled ?? []): Simulation {
     if (save.version !== SAVE_VERSION) throw new Error(`Save version ${save.version} is not supported`);
     const sim = new Simulation(decodeWorld(save.world), modules, disabled, false);
     const enabled = sim.modules.map((m) => m.id);
@@ -153,6 +152,7 @@ export class Simulation {
     return {
       version: SAVE_VERSION,
       modules: this.modules.map((m) => m.id),
+      disabled: [...this.disabled],
       world: encodeWorld(this.world),
       commandLog: this.commandLog.map((c) => ({ ...c })),
     };

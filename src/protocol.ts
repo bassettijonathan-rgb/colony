@@ -1,4 +1,7 @@
 /** Messages between the page (main thread) and the simulation worker. */
+import type { ColonistView } from './modules/f3-people/api';
+
+export type { ColonistView };
 
 export type Speed = 0 | 1 | 3;
 
@@ -28,12 +31,13 @@ export interface SkyStatus {
 }
 
 export type FromWorker =
-  | { type: 'started'; seed: number; modules: string[]; map: MapSnapshot; summary: string }
+  | { type: 'started'; seed: number; modules: string[]; map: MapSnapshot; summary: string; colonists: ColonistView[]; home: { x: number; y: number } }
   | {
       type: 'tick';
       tick: number;
       tickMs: number;
       sky: SkyStatus;
+      colonists: ColonistView[];
       /** Tile layers that changed since the last message, if any. */
       layers?: Record<string, ArrayLike<number>>;
     }

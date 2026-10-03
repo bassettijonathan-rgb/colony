@@ -3,6 +3,7 @@ import { Simulation, type Command } from './core';
 import { ALL_MODULES } from './modules';
 import { worldMap } from './modules/f1-world/api';
 import { clock } from './modules/f2-time/api';
+import { people, type ColonistView } from './modules/f3-people/api';
 import { TICKS_PER_SECOND, type FromWorker, type SkyStatus, type Speed, type ToWorker } from './protocol';
 
 /**
@@ -34,6 +35,11 @@ function skyStatus(sim: Simulation): SkyStatus {
   };
 }
 
+function colonists(sim: Simulation): ColonistView[] {
+  const crew = sim.services.get(people);
+  return crew.ids().flatMap((id) => crew.get(id) ?? []);
+}
+
 function changedLayers(sim: Simulation): Record<string, ArrayLike<number>> | undefined {
   const now = performance.now();
   if (now - lastLayerSend < LAYER_SEND_MS) return undefined;
@@ -63,7 +69,7 @@ function frame(): void {
   sim.step(ticks);
   const tickMs = (performance.now() - t0) / ticks;
   const layers = changedLayers(sim);
-  post({ type: 'tick', tick: sim.world.tick, tickMs, sky: skyStatus(sim), ...(layers ? { layers } : {}) });
+  post({ type: 'tick', tick: sim.world.tick, tickMs, sky: skyStatus(sim), colonists: colonists(sim), ...(layers ? { layers } : {}) });
 }
 
 self.onmessage = (event: MessageEvent<ToWorker>) => {
@@ -82,6 +88,8 @@ self.onmessage = (event: MessageEvent<ToWorker>) => {
           modules: sim.modules.map((m) => m.id),
           map: { width: sim.world.width, height: sim.world.height, layers },
           summary: map.biome().name + ', ' + map.hilliness().replace('-', ' '),
+          colonists: colonists(sim),
+          home: sim.services.get(people).home(),
         });
         timer ??= setInterval(frame, FRAME_MS);
         break;

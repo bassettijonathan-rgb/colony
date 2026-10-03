@@ -11,6 +11,8 @@ export const SAVE_VERSION = 1;
 export interface SaveFile {
   version: number;
   modules: string[];
+  /** Modules that were switched off, so loading switches them off again. */
+  disabled: string[];
   world: unknown;
   commandLog: LoggedCommand[];
 }

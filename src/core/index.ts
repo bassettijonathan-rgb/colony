@@ -3,6 +3,7 @@ export * from './hash';
 export * from './loader';
 export * from './module';
 export * from './noise';
+export * from './path';
 export * from './phases';
 export * from './registry';
 export * from './rng';

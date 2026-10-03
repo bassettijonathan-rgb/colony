@@ -53,7 +53,8 @@ A module is a `defineModule({...})` object (see `src/core/module.ts` and the sam
 - `id`, `name`, `layer` (foundation, core, society, pressure, frontier, dark, living), `deps`
 - `init`: creates the module's state for a new game (stored in `world.modules[id]`). New-game choices
   (biome, hilliness) arrive in `world.settings[id]`.
-- `setup`: defines the module's registries and provides its services (runs on every start and load)
+- `setup`: defines the module's registries and provides its services (runs on every start and load,
+  straight after the module's own `init`, so later modules' `init` can use earlier modules' services)
 - `contribute`: adds entries to other modules' registries (use `registries.find`, which returns
   undefined when the owner is off)
 - `systems`: `{ id, phase, every?, offset?, run(ctx) }`. Phases run in this order: commands,

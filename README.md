@@ -14,7 +14,9 @@ npm run sim -- --seed 7 --days 2 --colonists 200                   # speed check
 ```
 
 In the game, click a colonist (or a name in the list) to inspect them, and right-click the map to send
-them somewhere.
+them somewhere. Press **M** (or the Mine button) and drag over rock to mark it for mining; **X** drags
+to remove marks; **P** opens work priorities (click a cell to raise, right-click to lower). Esc or
+right-click puts a tool away. WASD or the arrow keys move the view; the mouse wheel zooms.
 
 In the browser, pick a map with the address bar: `?seed=7&biome=tundra&hills=mountainous&river=yes&season=winter`.
 Biomes: `temperate-forest`, `boreal-forest`, `arid-shrubland`, `tundra`. Hills: `flat`, `small-hills`,

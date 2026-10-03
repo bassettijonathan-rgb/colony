@@ -28,7 +28,8 @@ export interface Needs {
   rations: number;
 }
 
-export type ActivityKind = 'idle' | 'wander' | 'walk' | 'eat' | 'sleep';
+/** `work` means walking to, or doing, a job handed out by another module (see `assign`). */
+export type ActivityKind = 'idle' | 'wander' | 'walk' | 'eat' | 'sleep' | 'work';
 
 export interface Pawn {
   x: number;
@@ -42,6 +43,8 @@ export interface Pawn {
   until: number;
   /** Set when the player ordered this move, so needs don't interrupt it. */
   ordered: boolean;
+  /** What the colonist is working on, for the inspector (e.g. "Mining granite"). Empty when not working. */
+  task: string;
 }
 
 declare module '../../core/signals' {
@@ -74,6 +77,7 @@ export interface ColonistView {
   x: number;
   y: number;
   activity: ActivityKind;
+  task: string;
 }
 
 export interface PeopleService {
@@ -85,6 +89,18 @@ export interface PeopleService {
   isIdle(id: EntityId): boolean;
   /** Sends a colonist to a tile. False when there is no way there. */
   walkTo(id: EntityId, x: number, y: number): boolean;
+  /** The tile a colonist stands on (or is leaving), or null for nobody. */
+  tileOf(id: EntityId): { x: number; y: number } | null;
+  /** Free to take on work: standing around or wandering, not on the player's orders. */
+  isFree(id: EntityId): boolean;
+  /**
+   * Sends a colonist to a tile to work there. They keep the `work` activity on
+   * arrival until `release` is called or a need (hunger, sleep) takes over.
+   * False when there is no way there.
+   */
+  assign(id: EntityId, x: number, y: number, task: string): boolean;
+  /** Ends a colonist's work; they stand around and pick something else to do. */
+  release(id: EntityId): void;
 }
 
 /** Without the people module there is nobody. */
@@ -94,4 +110,8 @@ export const people = defineService<PeopleService>('f3-people.people', {
   home: () => ({ x: 0, y: 0 }),
   isIdle: () => false,
   walkTo: () => false,
+  tileOf: () => null,
+  isFree: () => false,
+  assign: () => false,
+  release: () => {},
 });

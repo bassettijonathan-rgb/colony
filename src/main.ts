@@ -2,6 +2,7 @@ import { h, render } from 'preact';
 import { MapView } from './render/mapView';
 import type { FromWorker, MapSnapshot, Speed, ToWorker } from './protocol';
 import { App, type AppProps } from './ui/App';
+import type { Tool } from './ui/Work';
 import { describeTile } from './ui/tileInfo';
 
 const mapEl = document.getElementById('map') as HTMLElement;
@@ -24,7 +25,7 @@ if (params.get('river')) world.river = params.get('river') === 'yes';
 const time: Record<string, unknown> = {};
 if (params.get('season')) time.startSeason = params.get('season');
 
-const state: Omit<AppProps, 'onSpeed' | 'onSelect'> = {
+const state: Omit<AppProps, 'onSpeed' | 'onSelect' | 'onTool' | 'onToggleWork' | 'onPriority'> = {
   seed,
   tick: 0,
   tickMs: 0,
@@ -36,7 +37,12 @@ const state: Omit<AppProps, 'onSpeed' | 'onSelect'> = {
   selected: null,
   hover: '',
   error: null,
+  work: null,
+  tool: null,
+  showWork: false,
 };
+/** Box colour for each area tool. */
+const TOOL_COLOUR: Record<Tool, number> = { mine: 0xffc040, cancel: 0xe07a6a };
 let map: MapSnapshot | null = null;
 
 function select(id: number | null): void {
@@ -59,9 +65,28 @@ function redraw(): void {
         redraw();
       },
       onSelect: select,
+      onTool: setTool,
+      onToggleWork: () => {
+        state.showWork = !state.showWork;
+        redraw();
+      },
+      onPriority: (id: number, workType: string, priority: number) => {
+        send({ type: 'command', command: { type: 'set-work-priority', payload: { id, workType, priority } } });
+        // Show the change now; the worker confirms it on the next tick (or when unpaused).
+        const row = state.work?.priorities[id];
+        if (row) row[workType] = priority;
+        redraw();
+      },
     }),
     uiEl,
   );
+}
+
+function setTool(tool: Tool | null): void {
+  state.tool = tool;
+  view.areaTool = tool ? TOOL_COLOUR[tool] : null;
+  mapEl.style.cursor = tool ? 'crosshair' : '';
+  redraw();
 }
 
 const view = new MapView();
@@ -79,9 +104,36 @@ view.onClick = (tile) => {
   select(best);
 };
 view.onRightClick = (tile) => {
+  // Right-click puts an area tool away; otherwise it sends the selected colonist.
+  if (state.tool) {
+    setTool(null);
+    return;
+  }
   if (state.selected === null) return;
   send({ type: 'command', command: { type: 'move-colonist', payload: { id: state.selected, x: tile.x, y: tile.y } } });
 };
+view.onArea = (area) => {
+  if (!state.tool) return;
+  const type = state.tool === 'mine' ? 'designate-mine' : 'cancel-designations';
+  send({ type: 'command', command: { type, payload: area } });
+};
+window.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const key = e.key.toLowerCase();
+  if (key === 'escape') {
+    if (state.tool) setTool(null);
+    else if (state.showWork) {
+      state.showWork = false;
+      redraw();
+    } else select(null);
+  } else if (!state.work) return;
+  else if (key === 'm') setTool(state.tool === 'mine' ? null : 'mine');
+  else if (key === 'x') setTool(state.tool === 'cancel' ? null : 'cancel');
+  else if (key === 'p') {
+    state.showWork = !state.showWork;
+    redraw();
+  }
+});
 view.onHover = (tile) => {
   state.hover = tile && map ? describeTile(map, tile.x, tile.y) : '';
   redraw();
@@ -94,6 +146,7 @@ worker.onmessage = (event: MessageEvent<FromWorker>) => {
       state.modules = msg.modules;
       state.summary = msg.summary;
       state.colonists = msg.colonists;
+      state.work = msg.work;
       map = msg.map;
       view.showMap(msg.map);
       // Start close in on the landing site, or on the whole map when nobody landed.
@@ -105,6 +158,7 @@ worker.onmessage = (event: MessageEvent<FromWorker>) => {
       state.tickMs = msg.tickMs;
       state.sky = msg.sky;
       state.colonists = msg.colonists;
+      state.work = msg.work;
       view.setLight(msg.sky.light);
       view.showPawns(pawnsToDraw(), state.selected);
       if (msg.layers && map) {

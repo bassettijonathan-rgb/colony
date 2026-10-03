@@ -3,8 +3,10 @@ import { Simulation, type Command } from './core';
 import { ALL_MODULES } from './modules';
 import { worldMap } from './modules/f1-world/api';
 import { clock } from './modules/f2-time/api';
+import { WORK_TYPES } from './content/work';
+import { WORK_MODULE_ID, workBoard } from './modules/c1-work/api';
 import { people, type ColonistView } from './modules/f3-people/api';
-import { TICKS_PER_SECOND, type FromWorker, type SkyStatus, type Speed, type ToWorker } from './protocol';
+import { TICKS_PER_SECOND, type FromWorker, type SkyStatus, type Speed, type ToWorker, type WorkStatus } from './protocol';
 
 /**
  * Runs the simulation off the main thread. Real time here only decides how
@@ -40,6 +42,16 @@ function colonists(sim: Simulation): ColonistView[] {
   return crew.ids().flatMap((id) => crew.get(id) ?? []);
 }
 
+function workStatus(sim: Simulation): WorkStatus | null {
+  if (!sim.modules.some((m) => m.id === WORK_MODULE_ID)) return null;
+  const board = sim.services.get(workBoard);
+  const priorities: WorkStatus['priorities'] = {};
+  for (const id of sim.services.get(people).ids()) {
+    priorities[id] = Object.fromEntries(WORK_TYPES.map((w) => [w.id, board.priorityOf(id, w.id)]));
+  }
+  return { types: WORK_TYPES.map(({ id, name, skill }) => ({ id, name, skill })), priorities, jobs: board.jobs().length };
+}
+
 function changedLayers(sim: Simulation): Record<string, ArrayLike<number>> | undefined {
   const now = performance.now();
   if (now - lastLayerSend < LAYER_SEND_MS) return undefined;
@@ -69,7 +81,15 @@ function frame(): void {
   sim.step(ticks);
   const tickMs = (performance.now() - t0) / ticks;
   const layers = changedLayers(sim);
-  post({ type: 'tick', tick: sim.world.tick, tickMs, sky: skyStatus(sim), colonists: colonists(sim), ...(layers ? { layers } : {}) });
+  post({
+    type: 'tick',
+    tick: sim.world.tick,
+    tickMs,
+    sky: skyStatus(sim),
+    colonists: colonists(sim),
+    work: workStatus(sim),
+    ...(layers ? { layers } : {}),
+  });
 }
 
 self.onmessage = (event: MessageEvent<ToWorker>) => {
@@ -90,6 +110,7 @@ self.onmessage = (event: MessageEvent<ToWorker>) => {
           summary: map.biome().name + ', ' + map.hilliness().replace('-', ' '),
           colonists: colonists(sim),
           home: sim.services.get(people).home(),
+          work: workStatus(sim),
         });
         timer ??= setInterval(frame, FRAME_MS);
         break;

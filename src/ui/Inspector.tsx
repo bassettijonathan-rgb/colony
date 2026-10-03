@@ -7,6 +7,7 @@ const ACTIVITY: Record<string, string> = {
   walk: 'Walking (ordered)',
   eat: 'Eating a ration',
   sleep: 'Sleeping',
+  work: 'Working',
 };
 
 function Bar(props: { label: string; value: number }) {
@@ -36,7 +37,7 @@ export function Inspector(props: { colonist: ColonistView; onClose(): void }) {
           ×
         </button>
       </div>
-      <div class="muted">{ACTIVITY[c.activity] ?? c.activity}</div>
+      <div class="muted">{c.task || (ACTIVITY[c.activity] ?? c.activity)}</div>
       <Bar label="Food" value={c.needs.food} />
       <Bar label="Rest" value={c.needs.rest} />
       <div class="muted">Rations left: {c.needs.rations}</div>

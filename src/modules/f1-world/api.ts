@@ -65,6 +65,11 @@ export interface WorldMapService {
   moveCost(x: number, y: number): number;
   isWalkable(x: number, y: number): boolean;
   isBuildable(x: number, y: number): boolean;
+  /**
+   * Digs out natural rock, leaving its floor (and any thin rock roof) behind.
+   * Returns what was dug, or null when there was no rock.
+   */
+  mineRock(x: number, y: number): { rock: RockDef; ore: OreDef | null } | null;
 }
 
 const SOIL = TERRAIN[0] as TerrainDef;
@@ -82,4 +87,5 @@ export const worldMap = defineService<WorldMapService>('f1-world.map', {
   moveCost: () => 1,
   isWalkable: () => true,
   isBuildable: () => true,
+  mineRock: () => null,
 });

@@ -1,4 +1,4 @@
-import { defineModule, inBounds, type World } from '../../core';
+import { defineModule, inBounds, touchLayer, type World } from '../../core';
 import { BIOMES, HILLINESS, type BiomeDef, type Hilliness } from '../../content/biomes';
 import { ORES } from '../../content/ores';
 import { ROCKS } from '../../content/rocks';
@@ -71,6 +71,18 @@ export const worldModule = defineModule<WorldState>({
       moveCost: (x, y) => (!inBounds(world, x, y) || hasRock(x, y) ? 0 : terrainAt(x, y).moveCost),
       isWalkable: (x, y) => inBounds(world, x, y) && !hasRock(x, y) && terrainAt(x, y).moveCost > 0,
       isBuildable: (x, y) => inBounds(world, x, y) && !hasRock(x, y) && terrainAt(x, y).buildable,
+      mineRock: (x, y) => {
+        if (!inBounds(world, x, y)) return null;
+        const i = at(x, y);
+        const rock = ROCKS[(layer(LAYER.rock)[i] ?? 0) - 1];
+        if (!rock) return null;
+        const ore = ORES[(layer(LAYER.ore)[i] ?? 0) - 1] ?? null;
+        layer(LAYER.rock)[i] = 0;
+        layer(LAYER.ore)[i] = 0;
+        touchLayer(world, LAYER.rock);
+        if (ore) touchLayer(world, LAYER.ore);
+        return { rock, ore };
+      },
     });
   },
 });

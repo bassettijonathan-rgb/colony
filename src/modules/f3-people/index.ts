@@ -87,7 +87,7 @@ function walkCost(env: Env): (x: number, y: number) => number {
 }
 
 /** Starts a pawn walking to a tile. False when there is no way there. */
-function startWalk(env: Env, pawn: Pawn, x: number, y: number, kind: 'walk' | 'wander'): boolean {
+function startWalk(env: Env, pawn: Pawn, x: number, y: number, kind: 'walk' | 'wander' | 'work'): boolean {
   const { width, height } = env.world;
   const path = findPath(width, height, walkCost(env), pawn, { x, y }, MAX_PATH_NODES);
   if (!path) return false;
@@ -103,6 +103,7 @@ function becomeIdle(pawn: Pawn, until: number): void {
   pawn.progress = 0;
   pawn.ordered = false;
   pawn.until = until;
+  pawn.task = '';
 }
 
 function view(env: Env, id: EntityId): ColonistView | null {
@@ -119,7 +120,7 @@ function view(env: Env, id: EntityId): ColonistView | null {
     x += (nx - x) * pawn.progress;
     y += (ny - y) * pawn.progress;
   }
-  return { id, person, needs, x, y, activity: pawn.activity };
+  return { id, person, needs, x, y, activity: pawn.activity, task: pawn.task };
 }
 
 function pickWanderTarget(ctx: Ctx, pawn: Pawn): { x: number; y: number } | null {
@@ -135,7 +136,11 @@ function pickWanderTarget(ctx: Ctx, pawn: Pawn): { x: number; y: number } | null
   return null;
 }
 
-/** Decides what idle (or wandering) colonists do next: eat, sleep or wander. */
+/**
+ * Sends hungry colonists to eat and tired ones to sleep, interrupting
+ * wandering and work. Free colonists are then offered work by other modules
+ * (in the same phase); anyone still idle wanders off in the work phase.
+ */
 function chooseActivities(ctx: Ctx): void {
   const now = ctx.world.tick;
   const pawns = table<Pawn>(ctx.world, COMPONENT.pawn);
@@ -161,16 +166,11 @@ function chooseActivities(ctx: Ctx): void {
     if (needs.rest < TIRED || (dark && needs.rest < 0.8)) {
       becomeIdle(pawn, now);
       pawn.activity = 'sleep';
-      continue;
-    }
-    if (pawn.activity === 'idle' && now >= pawn.until) {
-      const target = pickWanderTarget(ctx, pawn);
-      if (!target || !startWalk(ctx, pawn, target.x, target.y, 'wander')) pawn.until = now + TICKS_PER_HOUR / 4;
     }
   }
 }
 
-/** Moves walkers along their paths and finishes eating and sleeping. */
+/** Moves walkers along their paths, finishes eating and sleeping, and sends idle colonists wandering. */
 function act(ctx: Ctx): void {
   const now = ctx.world.tick;
   const { width } = ctx.world;
@@ -182,10 +182,12 @@ function act(ctx: Ctx): void {
     const needs = needsTable.get(id) as Needs;
     switch (pawn.activity) {
       case 'walk':
-      case 'wander': {
+      case 'wander':
+      case 'work': {
         const next = pawn.path[0];
         if (next === undefined) {
-          becomeIdle(pawn, now + ctx.rng.range(IDLE_PAUSE[0], IDLE_PAUSE[1]));
+          // Workers stay put at their job; everyone else pauses for a while.
+          if (pawn.activity !== 'work') becomeIdle(pawn, now + ctx.rng.range(IDLE_PAUSE[0], IDLE_PAUSE[1]));
           break;
         }
         const nx = next % width;
@@ -204,7 +206,7 @@ function act(ctx: Ctx): void {
           pawn.x = nx;
           pawn.y = ny;
           pawn.path.shift();
-          if (pawn.path.length === 0) becomeIdle(pawn, now + ctx.rng.range(IDLE_PAUSE[0], IDLE_PAUSE[1]));
+          if (pawn.path.length === 0 && pawn.activity !== 'work') becomeIdle(pawn, now + ctx.rng.range(IDLE_PAUSE[0], IDLE_PAUSE[1]));
         }
         break;
       }
@@ -223,6 +225,10 @@ function act(ctx: Ctx): void {
         break;
       }
       case 'idle':
+        if (now >= pawn.until) {
+          const target = pickWanderTarget(ctx, pawn);
+          if (!target || !startWalk(ctx, pawn, target.x, target.y, 'wander')) pawn.until = now + TICKS_PER_HOUR / 4;
+        }
         break;
     }
   }
@@ -238,8 +244,9 @@ function decayNeeds(ctx: Ctx): void {
 
 /**
  * F3 People: colonists with names, ages and skills; hunger and rest; walking
- * and pathfinding. Until the work module lands, colonists eat their packed
- * rations, sleep where they stand at night, and wander near the landing site.
+ * and pathfinding. Colonists eat their packed rations, sleep where they stand
+ * at night, go to work that other modules hand out (see `assign`), and
+ * otherwise wander near the landing site.
  */
 export const peopleModule = defineModule<PeopleState>({
   id: PEOPLE_MODULE_ID,
@@ -266,7 +273,7 @@ export const peopleModule = defineModule<PeopleState>({
       persons.set(id, person);
       // Fresh out of the pods: fed, but groggy.
       needsTable.set(id, { food: 0.8 + ctx.rng.float() * 0.2, rest: 0.5 + ctx.rng.float() * 0.3, rations: STARTING_RATIONS });
-      pawns.set(id, { x: tile.x, y: tile.y, path: [], progress: 0, activity: 'idle', until: ctx.rng.range(0, 60), ordered: false });
+      pawns.set(id, { x: tile.x, y: tile.y, path: [], progress: 0, activity: 'idle', until: ctx.rng.range(0, 60), ordered: false, task: '' });
       ctx.emit('colonist-arrived', { id, name: person.name });
     }
     return { home, starving: [] };
@@ -275,14 +282,39 @@ export const peopleModule = defineModule<PeopleState>({
   setup: (ctx) => {
     validatePeopleContent();
     const env: Env = ctx;
+    const pawnOf = (id: EntityId): Pawn | undefined => table<Pawn>(env.world, COMPONENT.pawn).get(id);
     ctx.services.provide(people, {
       ids: () => [...table<Pawn>(env.world, COMPONENT.pawn).keys()],
       get: (id) => view(env, id),
       home: () => ({ ...env.state.home }),
       isIdle: (id) => table<Pawn>(env.world, COMPONENT.pawn).get(id)?.activity === 'idle',
       walkTo: (id, x, y) => {
-        const pawn = table<Pawn>(env.world, COMPONENT.pawn).get(id);
+        const pawn = pawnOf(id);
         return pawn ? startWalk(env, pawn, x, y, 'walk') : false;
+      },
+      tileOf: (id) => {
+        const pawn = pawnOf(id);
+        return pawn ? { x: pawn.x, y: pawn.y } : null;
+      },
+      isFree: (id) => {
+        const pawn = pawnOf(id);
+        return !!pawn && !pawn.ordered && (pawn.activity === 'idle' || pawn.activity === 'wander');
+      },
+      assign: (id, x, y, task) => {
+        const pawn = pawnOf(id);
+        if (!pawn) return false;
+        const previous = { ...pawn, path: [...pawn.path] };
+        becomeIdle(pawn, pawn.until);
+        if (!startWalk(env, pawn, x, y, 'work')) {
+          Object.assign(pawn, previous);
+          return false;
+        }
+        pawn.task = task;
+        return true;
+      },
+      release: (id) => {
+        const pawn = pawnOf(id);
+        if (pawn?.activity === 'work') becomeIdle(pawn, pawn.until);
       },
     });
   },

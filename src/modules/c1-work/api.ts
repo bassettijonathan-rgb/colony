@@ -30,6 +30,13 @@ export interface JobPost {
   amount: number;
   /** Shown in the inspector while a colonist works on it, e.g. "Mining granite". */
   label: string;
+  /** Work standing on the target tile instead of beside it (picking something up). */
+  standOn?: boolean;
+  /**
+   * Only this colonist may take the job (delivering what they carry). They
+   * take it before anything else, whatever their priorities.
+   */
+  only?: EntityId;
 }
 
 export interface Job extends JobPost {

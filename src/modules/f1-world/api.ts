@@ -2,7 +2,7 @@
  * What other modules, the worker and the UI may use from the world module:
  * layer names, roof values, settings and the map service.
  */
-import { defineService } from '../../core';
+import { defineService, registryKey } from '../../core';
 import { BIOMES, type BiomeDef, type Hilliness } from '../../content/biomes';
 import type { OreDef } from '../../content/ores';
 import type { RockDef } from '../../content/rocks';
@@ -71,6 +71,19 @@ export interface WorldMapService {
    */
   mineRock(x: number, y: number): { rock: RockDef; ore: OreDef | null } | null;
 }
+
+/**
+ * Extra rules other modules add about tiles, such as walls that block walking.
+ * Contribute entries to the `TILE_RULES` registry; the map service applies them
+ * on top of terrain and rock.
+ */
+export interface TileRule {
+  /** Walking cost multiplier for this tile: 0 blocks it, undefined means no opinion. */
+  moveCost?(x: number, y: number): number | undefined;
+  /** False when nothing more can be built here (a wall already stands), undefined for no opinion. */
+  buildable?(x: number, y: number): boolean | undefined;
+}
+export const TILE_RULES = registryKey<TileRule>('f1-world.tile-rules');
 
 const SOIL = TERRAIN[0] as TerrainDef;
 const DEFAULT_BIOME = BIOMES[0] as BiomeDef;

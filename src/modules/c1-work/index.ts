@@ -48,7 +48,7 @@ export function workSpeed(skill: number): number {
 function validateWorkContent(): void {
   checkUniqueIds('work', WORK_TYPES);
   for (const w of WORK_TYPES) {
-    check(SKILLS.some((s) => s.id === w.skill), `work: "${w.id}" uses unknown skill "${w.skill}"`);
+    check(w.skill === null || SKILLS.some((s) => s.id === w.skill), `work: "${w.id}" uses unknown skill "${w.skill}"`);
     check(Number.isFinite(w.order), `work: "${w.id}" needs a numeric order`);
   }
 }
@@ -101,9 +101,13 @@ function removeJob(env: Env, job: Job): void {
   }
 }
 
-/** The walkable tile beside a target that is closest to the colonist, or null when it is walled in. */
+/**
+ * Where to stand for a job: on the target for jobs that say so, otherwise the
+ * walkable tile beside it that is closest to the colonist. Null when there is nowhere.
+ */
 function standFor(env: Env, job: Job, from: { x: number; y: number }): { x: number; y: number } | null {
   const map = env.services.get(worldMap);
+  if (job.standOn) return map.isWalkable(job.x, job.y) ? { x: job.x, y: job.y } : null;
   let best: { x: number; y: number } | null = null;
   let bestDistance = Infinity;
   for (const [dx, dy] of [
@@ -134,38 +138,49 @@ function workGroups(world: World, colonist: EntityId): WorkTypeDef[][] {
   return groups;
 }
 
-/** Gives a free colonist the nearest open job they are willing to do and can reach. */
+/**
+ * Gives a free colonist the nearest open job they can reach: first any job
+ * meant only for them, then by their work priorities.
+ */
 function claimJob(ctx: Ctx, colonist: EntityId): void {
-  const crew = ctx.services.get(people);
-  const from = crew.tileOf(colonist);
+  const from = ctx.services.get(people).tileOf(colonist);
   if (!from) return;
-  const now = ctx.world.tick;
+  const mine = (job: Job): number | undefined => (job.only === colonist ? 0 : undefined);
+  if (tryJobs(ctx, colonist, from, mine)) return;
   for (const group of workGroups(ctx.world, colonist)) {
     // Work types earlier in the group win ties; otherwise the nearest job wins.
     const rank = new Map(group.map((w, k) => [w.id, k]));
-    const open: { job: Job; rank: number; distance: number }[] = [];
-    for (const job of ctx.state.jobs.values()) {
-      const r = rank.get(job.workType);
-      if (r === undefined || job.worker !== null || (ctx.state.unreachable.get(job.id) ?? 0) > now) continue;
-      open.push({ job, rank: r, distance: (job.x - from.x) ** 2 + (job.y - from.y) ** 2 });
-    }
-    open.sort((a, b) => a.rank - b.rank || a.distance - b.distance || a.job.id - b.job.id);
-    let tries = 0;
-    for (const { job } of open) {
-      if (tries >= PATH_TRIES) break;
-      const stand = standFor(ctx, job, from);
-      if (!stand) continue;
-      tries++;
-      if (!crew.assign(colonist, stand.x, stand.y, job.label)) {
-        ctx.state.unreachable.set(job.id, now + UNREACHABLE_TICKS);
-        continue;
-      }
-      job.worker = colonist;
-      job.stand = stand;
-      ctx.emit('job-started', { job: job.id, kind: job.kind, worker: colonist, x: job.x, y: job.y });
-      return;
-    }
+    if (tryJobs(ctx, colonist, from, (job) => (job.only === undefined ? rank.get(job.workType) : undefined))) return;
   }
+}
+
+/** Tries the nearest open jobs that `rankOf` accepts (lower rank first). True when one was taken. */
+function tryJobs(ctx: Ctx, colonist: EntityId, from: { x: number; y: number }, rankOf: (job: Job) => number | undefined): boolean {
+  const crew = ctx.services.get(people);
+  const now = ctx.world.tick;
+  const open: { job: Job; rank: number; distance: number }[] = [];
+  for (const job of ctx.state.jobs.values()) {
+    const rank = rankOf(job);
+    if (rank === undefined || job.worker !== null || (ctx.state.unreachable.get(job.id) ?? 0) > now) continue;
+    open.push({ job, rank, distance: (job.x - from.x) ** 2 + (job.y - from.y) ** 2 });
+  }
+  open.sort((a, b) => a.rank - b.rank || a.distance - b.distance || a.job.id - b.job.id);
+  let tries = 0;
+  for (const { job } of open) {
+    if (tries >= PATH_TRIES) break;
+    const stand = standFor(ctx, job, from);
+    if (!stand) continue;
+    tries++;
+    if (!crew.assign(colonist, stand.x, stand.y, job.label)) {
+      ctx.state.unreachable.set(job.id, now + UNREACHABLE_TICKS);
+      continue;
+    }
+    job.worker = colonist;
+    job.stand = stand;
+    ctx.emit('job-started', { job: job.id, kind: job.kind, worker: colonist, x: job.x, y: job.y });
+    return true;
+  }
+  return false;
 }
 
 function assignJobs(ctx: Ctx): void {
@@ -212,7 +227,7 @@ function doWork(ctx: Ctx): void {
     const at = crew.tileOf(worker);
     if (!at || at.x !== job.stand.x || at.y !== job.stand.y || colonist.x !== at.x || colonist.y !== at.y) continue;
     const type = workType(job.workType);
-    job.done += workSpeed(type ? (colonist.person.skills[type.skill] ?? 0) : 0);
+    job.done += type?.skill ? workSpeed(colonist.person.skills[type.skill] ?? 0) : 1;
     if (job.done < job.amount) continue;
     removeJob(ctx, job);
     if (job.owner === WORK_MODULE_ID) finishOwnJob(ctx, job, worker);

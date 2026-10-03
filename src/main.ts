@@ -2,7 +2,7 @@ import { h, render } from 'preact';
 import { MapView } from './render/mapView';
 import type { FromWorker, MapSnapshot, Speed, ToWorker } from './protocol';
 import { App, type AppProps } from './ui/App';
-import type { Tool } from './ui/Work';
+import { toolForKey, type Tool } from './ui/Work';
 import { describeTile } from './ui/tileInfo';
 
 const mapEl = document.getElementById('map') as HTMLElement;
@@ -38,11 +38,12 @@ const state: Omit<AppProps, 'onSpeed' | 'onSelect' | 'onTool' | 'onToggleWork' |
   hover: '',
   error: null,
   work: null,
+  stock: {},
   tool: null,
   showWork: false,
 };
 /** Box colour for each area tool. */
-const TOOL_COLOUR: Record<Tool, number> = { mine: 0xffc040, cancel: 0xe07a6a };
+const toolColour = (tool: Tool): number => (tool === 'mine' ? 0xffc040 : tool === 'cancel' ? 0xe07a6a : 0x7fb0e0);
 let map: MapSnapshot | null = null;
 
 function select(id: number | null): void {
@@ -84,7 +85,7 @@ function redraw(): void {
 
 function setTool(tool: Tool | null): void {
   state.tool = tool;
-  view.areaTool = tool ? TOOL_COLOUR[tool] : null;
+  view.areaTool = tool ? toolColour(tool) : null;
   mapEl.style.cursor = tool ? 'crosshair' : '';
   redraw();
 }
@@ -114,7 +115,12 @@ view.onRightClick = (tile) => {
 };
 view.onArea = (area) => {
   if (!state.tool) return;
-  const type = state.tool === 'mine' ? 'designate-mine' : 'cancel-designations';
+  const tool = state.tool;
+  if (tool.startsWith('build:')) {
+    send({ type: 'command', command: { type: 'place-blueprints', payload: { ...area, building: tool.slice('build:'.length) } } });
+    return;
+  }
+  const type = tool === 'mine' ? 'designate-mine' : 'cancel-designations';
   send({ type: 'command', command: { type, payload: area } });
 };
 window.addEventListener('keydown', (e) => {
@@ -127,8 +133,10 @@ window.addEventListener('keydown', (e) => {
       redraw();
     } else select(null);
   } else if (!state.work) return;
-  else if (key === 'm') setTool(state.tool === 'mine' ? null : 'mine');
-  else if (key === 'x') setTool(state.tool === 'cancel' ? null : 'cancel');
+  else if (toolForKey(key)) {
+    const tool = toolForKey(key);
+    setTool(state.tool === tool ? null : tool);
+  }
   else if (key === 'p') {
     state.showWork = !state.showWork;
     redraw();
@@ -159,6 +167,7 @@ worker.onmessage = (event: MessageEvent<FromWorker>) => {
       state.sky = msg.sky;
       state.colonists = msg.colonists;
       state.work = msg.work;
+      state.stock = msg.stock;
       view.setLight(msg.sky.light);
       view.showPawns(pawnsToDraw(), state.selected);
       if (msg.layers && map) {

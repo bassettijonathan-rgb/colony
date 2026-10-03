@@ -1,3 +1,4 @@
+import { ITEMS } from '../content/items';
 import type { ColonistView, SkyStatus, Speed, WorkStatus } from '../protocol';
 import { ColonistList, Inspector } from './Inspector';
 import { Toolbar, WorkPanel, type Tool } from './Work';
@@ -18,6 +19,8 @@ export interface AppProps {
   selected: number | null;
   /** Null when the work module is off. */
   work: WorkStatus | null;
+  /** Item id to how many the colony has. */
+  stock: Record<string, number>;
   tool: Tool | null;
   showWork: boolean;
   onSpeed(speed: Speed): void;
@@ -70,10 +73,23 @@ function TopBar(props: AppProps) {
           </button>
         ))}
       </span>
+      {Object.keys(props.stock).length > 0 && <span class="stock">{describeStock(props.stock)}</span>}
       <span class="muted">{props.tickMs.toFixed(2)} ms/tick</span>
       <span class="muted">modules: {props.modules.length === 0 ? 'none yet' : props.modules.join(', ')}</span>
       {props.error && <span class="error">{props.error}</span>}
       {props.hover && <span class="hover">{props.hover}</span>}
     </div>
   );
+}
+
+/** "Steel 300 · Stone 12 · Iron ore 10": stone chunks of every rock count together. */
+function describeStock(stock: Record<string, number>): string {
+  const parts = new Map<string, number>();
+  for (const item of ITEMS) {
+    const n = stock[item.id];
+    if (!n) continue;
+    const name = item.tags.includes('stone') ? 'Stone' : item.name;
+    parts.set(name, (parts.get(name) ?? 0) + n);
+  }
+  return [...parts].map(([name, n]) => `${name} ${n}`).join(' · ');
 }

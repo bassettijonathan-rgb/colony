@@ -13,6 +13,7 @@ import { Simulation } from '../src/core';
 import { ALL_MODULES } from '../src/modules';
 import { worldMap, type WorldSettings } from '../src/modules/f1-world';
 import { clock, TICKS_PER_DAY, TICKS_PER_HOUR, type TimeSettings } from '../src/modules/f2-time';
+import { stock } from '../src/modules/c2-construction';
 import { people, type PeopleSettings } from '../src/modules/f3-people';
 
 const { values } = parseArgs({
@@ -150,3 +151,6 @@ if (sim.modules.some((m) => m.id === 'f3-people')) {
   }
   if (ids.length > 20) console.log(`  ... and ${ids.length - 20} more`);
 }
+
+const totals = Object.entries(sim.services.get(stock).totals());
+if (totals.length > 0) console.log(`stock       ${totals.map(([id, n]) => `${id} ${n}`).join(', ')}`);

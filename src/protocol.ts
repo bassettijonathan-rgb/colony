@@ -15,7 +15,8 @@ export type ToWorker =
 
 /** The work types colonists can be given priorities for, and everyone's priorities. */
 export interface WorkStatus {
-  types: { id: string; name: string; skill: string }[];
+  /** In the order colonists consider them at equal priority. */
+  types: { id: string; name: string; skill: string | null }[];
   /** Colonist id to work type id to priority (0 = never, 1 = first ... 4 = last). */
   priorities: Record<number, Record<string, number>>;
   /** Jobs waiting or under way. */
@@ -58,6 +59,8 @@ export type FromWorker =
       sky: SkyStatus;
       colonists: ColonistView[];
       work: WorkStatus | null;
+      /** Item id to how many the colony has. */
+      stock: Record<string, number>;
       /** Tile layers that changed since the last message, if any. */
       layers?: Record<string, ArrayLike<number>>;
     }

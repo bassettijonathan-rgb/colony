@@ -7,9 +7,13 @@
 export interface WorkTypeDef {
   id: string;
   name: string;
-  /** Skill id from skills.ts. */
-  skill: string;
+  /** Skill id from skills.ts that sets the pace, or null for work anyone does at the same speed. */
+  skill: string | null;
   order: number;
 }
 
-export const WORK_TYPES: readonly WorkTypeDef[] = [{ id: 'mining', name: 'Mining', skill: 'mining', order: 50 }];
+export const WORK_TYPES: readonly WorkTypeDef[] = [
+  { id: 'mining', name: 'Mining', skill: 'mining', order: 50 },
+  { id: 'construction', name: 'Construction', skill: 'construction', order: 40 },
+  { id: 'hauling', name: 'Hauling', skill: null, order: 90 },
+];

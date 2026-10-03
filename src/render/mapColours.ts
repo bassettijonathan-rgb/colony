@@ -1,7 +1,11 @@
 import { ORES } from '../content/ores';
 import { ROCKS } from '../content/rocks';
 import { TERRAIN } from '../content/terrain';
+import type { Graphics } from 'pixi.js';
+import { BUILDINGS } from '../content/buildings';
+import { ITEMS } from '../content/items';
 import { DESIGNATION } from '../modules/c1-work/api';
+import { CONSTRUCTION_LAYER } from '../modules/c2-construction/api';
 import { LAYER, ROOF } from '../modules/f1-world/api';
 import type { MapSnapshot } from '../protocol';
 
@@ -108,4 +112,48 @@ export function designationOverlay(map: MapSnapshot, marks: ArrayLike<number>): 
     }
   }
   return out;
+}
+
+const buildingRgb = BUILDINGS.map((b) => parse(b.colour));
+const itemColour = ITEMS.map((i) => parseInt(i.colour.slice(1), 16));
+
+/** Finished walls and doors, drawn solid over the ground. */
+export function buildingOverlay(map: MapSnapshot, built: ArrayLike<number>): Uint8ClampedArray {
+  const out = new Uint8ClampedArray(map.width * map.height * 4);
+  for (let i = 0; i < built.length; i++) {
+    const b = built[i] ?? 0;
+    if (b === 0) continue;
+    const rgb = shade(buildingRgb[b - 1] ?? [255, 0, 255], speckle(i) * 0.5);
+    out.set([rgb[0], rgb[1], rgb[2], 255], i * 4);
+  }
+  return out;
+}
+
+/** Blueprints: a pale blue ghost of the building. */
+export function blueprintOverlay(map: MapSnapshot, plans: ArrayLike<number>): Uint8ClampedArray {
+  const out = new Uint8ClampedArray(map.width * map.height * 4);
+  for (let i = 0; i < plans.length; i++) {
+    const b = plans[i] ?? 0;
+    if (b === 0) continue;
+    const [r, g, bl] = buildingRgb[b - 1] ?? [255, 0, 255];
+    out.set([(r + 110) / 2, (g + 170) / 2, (bl + 230) / 2, 140], i * 4);
+  }
+  return out;
+}
+
+/** Stacks of items as small squares, a bigger square for a bigger stack. */
+export function drawItems(g: Graphics, map: MapSnapshot, tilePx: number): void {
+  const kinds = map.layers[CONSTRUCTION_LAYER.item];
+  const counts = map.layers[CONSTRUCTION_LAYER.itemCount];
+  if (!kinds) return;
+  for (let i = 0; i < kinds.length; i++) {
+    const k = kinds[i] ?? 0;
+    if (k === 0) continue;
+    const x = i % map.width;
+    const y = (i - x) / map.width;
+    const full = Math.min(1, (counts?.[i] ?? 1) / (ITEMS[k - 1]?.stack ?? 1));
+    const size = tilePx * (0.45 + 0.25 * full);
+    const pad = (tilePx - size) / 2;
+    g.rect(x * tilePx + pad, y * tilePx + pad, size, size).fill(itemColour[k - 1] ?? 0xff00ff).stroke({ color: 0x1a1a1a, width: 0.75 });
+  }
 }

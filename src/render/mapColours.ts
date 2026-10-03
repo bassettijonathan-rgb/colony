@@ -73,6 +73,8 @@ export function colourMap(map: MapSnapshot): Uint8ClampedArray {
         rgb = shade(rgb, ((elevation?.[i] ?? 128) / 255 - 0.5) * 0.15);
         // Dug-out ground still under a rock roof is darker, so caves read as caves.
         if ((roof?.[i] ?? 0) === ROOF.rock || roof?.[i] === ROOF.overhead) rgb = shade(rgb, -0.3);
+        // Built roofs shade the floor a little less.
+        else if (roof?.[i] === ROOF.constructed) rgb = shade(rgb, -0.18);
       }
       rgb = shade(rgb, speckle(i));
     }
@@ -156,4 +158,25 @@ export function drawItems(g: Graphics, map: MapSnapshot, tilePx: number): void {
     const pad = (tilePx - size) / 2;
     g.rect(x * tilePx + pad, y * tilePx + pad, size, size).fill(itemColour[k - 1] ?? 0xff00ff).stroke({ color: 0x1a1a1a, width: 0.75 });
   }
+}
+
+/** Each enclosed room in its own soft colour; outdoors and walls stay clear. */
+export function roomOverlay(map: MapSnapshot, roomIds: ArrayLike<number>): Uint8ClampedArray {
+  const out = new Uint8ClampedArray(map.width * map.height * 4);
+  for (let i = 0; i < roomIds.length; i++) {
+    const id = roomIds[i] ?? 0;
+    if (id < 2) continue;
+    // Spread hues around the wheel by the golden angle so neighbouring rooms differ.
+    const hue = (id * 137.508) % 360;
+    const [r, g, b] = hsl(hue, 0.6, 0.6);
+    out.set([r, g, b, 110], i * 4);
+  }
+  return out;
+}
+
+function hsl(h: number, s: number, l: number): Rgb {
+  const k = (n: number): number => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number): number => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+  return [Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255)];
 }

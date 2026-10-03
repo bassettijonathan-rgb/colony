@@ -24,6 +24,7 @@ import {
   CONSTRUCTION_MODULE_ID,
   ITEM_COMPONENT,
   stock,
+  structures,
   type Blueprint,
   type ItemStack,
 } from './api';
@@ -344,6 +345,7 @@ function finishBuildings(ctx: Ctx): void {
     const i = bp.y * ctx.world.width + bp.x;
     if (standing.has(i)) continue;
     const def = buildingDef(bp.def);
+    clearTile(ctx, bp.x, bp.y);
     despawnEntity(ctx.world, id);
     layer(ctx.world, L.blueprint)[i] = 0;
     layer(ctx.world, L.building)[i] = BUILDINGS.findIndex((b) => b.id === bp.def) + 1;
@@ -351,6 +353,17 @@ function finishBuildings(ctx: Ctx): void {
     touchLayer(ctx.world, L.building);
     if (def) ctx.emit('building-finished', { x: bp.x, y: bp.y, building: def.id, builder: bp.builder ?? 0 });
   }
+}
+
+/** Moves anything lying on a tile to the nearest free spot, so a building can go up there. */
+function clearTile(env: Env, x: number, y: number): void {
+  const here = itemAt(env.world, x, y);
+  if (!here) return;
+  const [id, stack] = here;
+  for (const haul of [...env.state.hauls.values()]) if (haul.item === id) dropHaul(env, haul);
+  const { def, count } = stack;
+  takeItems(env, id, count);
+  dropItems(env, def, count, x, y);
 }
 
 function clampArea(world: World, a: TileArea): { x0: number; y0: number; x1: number; y1: number } | null {
@@ -375,7 +388,7 @@ function placeBlueprints(ctx: Ctx, payload: TileArea & { building: string }): vo
       const edge = x === a.x0 || x === a.x1 || y === a.y0 || y === a.y1;
       if (def.drag === 'outline' && !edge) continue;
       const i = y * ctx.world.width + x;
-      if (!map.isBuildable(x, y) || plan[i] !== 0 || layer(ctx.world, L.item)[i] !== 0) continue;
+      if (!map.isBuildable(x, y) || plan[i] !== 0) continue;
       blueprints(ctx.world).set(spawnEntity(ctx.world), { def: def.id, x, y, delivered: {}, job: null, built: false, builder: null });
       plan[i] = index;
       changed = true;
@@ -408,6 +421,9 @@ export const constructionModule = defineModule<ConstructionState>({
   setup: (ctx) => {
     validateConstructionContent();
     const { world } = ctx;
+    ctx.services.provide(structures, {
+      buildingAt: (x, y) => (inBounds(world, x, y) ? (BUILDINGS[(layer(world, L.building)[y * world.width + x] ?? 0) - 1] ?? null) : null),
+    });
     ctx.services.provide(stock, {
       totals: () => {
         const counts = new Map<string, number>();

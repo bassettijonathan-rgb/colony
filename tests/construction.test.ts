@@ -14,6 +14,7 @@ import {
 import { worldMap } from '../src/modules/f1-world';
 import { TICKS_PER_DAY, TICKS_PER_HOUR } from '../src/modules/f2-time';
 import { people } from '../src/modules/f3-people';
+import { clearArea, rockFaces } from './mapHelpers';
 
 type Finished = SignalMap['building-finished'];
 
@@ -43,42 +44,6 @@ const itemsOf = (sim: Simulation) => [...((sim.world.components[ITEM_COMPONENT] 
 const blueprintsOf = (sim: Simulation) => [...((sim.world.components[BLUEPRINT_COMPONENT] ?? new Map()) as Map<EntityId, Blueprint>).values()];
 const steel = (sim: Simulation) => sim.services.get(stock).totals().steel ?? 0;
 const at = (sim: Simulation, name: string, x: number, y: number) => (sim.world.layers[name] as Uint16Array)[y * sim.world.width + x] ?? 0;
-
-/** The top-left corner of a clear, buildable w x h area near home, without items on it. */
-function clearArea(sim: Simulation, w: number, h: number, dx = 4, dy = -8): { x: number; y: number } {
-  const map = sim.services.get(worldMap);
-  const home = sim.services.get(people).home();
-  for (let r = 0; r < 30; r++) {
-    for (let y = home.y + dy - r; y <= home.y + dy + r; y++) {
-      for (let x = home.x + dx - r; x <= home.x + dx + r; x++) {
-        let ok = true;
-        for (let yy = y - 1; yy <= y + h && ok; yy++) {
-          for (let xx = x - 1; xx <= x + w && ok; xx++) {
-            ok = map.isBuildable(xx, yy) && at(sim, CONSTRUCTION_LAYER.item, xx, yy) === 0;
-          }
-        }
-        if (ok) return { x, y };
-      }
-    }
-  }
-  throw new Error('no clear area');
-}
-
-/** The rock tiles nearest home that can be dug from open ground. */
-function rockFaces(sim: Simulation, count: number): { x: number; y: number }[] {
-  const map = sim.services.get(worldMap);
-  const home = sim.services.get(people).home();
-  const faces: { x: number; y: number; d: number }[] = [];
-  for (let y = 1; y < sim.world.height - 1; y++) {
-    for (let x = 1; x < sim.world.width - 1; x++) {
-      if (!map.rockAt(x, y)) continue;
-      if (map.isWalkable(x + 1, y) || map.isWalkable(x - 1, y) || map.isWalkable(x, y + 1) || map.isWalkable(x, y - 1)) {
-        faces.push({ x, y, d: (x - home.x) ** 2 + (y - home.y) ** 2 });
-      }
-    }
-  }
-  return faces.sort((a, b) => a.d - b.d || a.y - b.y || a.x - b.x).slice(0, count);
-}
 
 describe('items', () => {
   it('land with 300 steel in full stacks, one stack per tile, on walkable ground near home', () => {
@@ -177,12 +142,20 @@ describe('building', () => {
     expect(blueprintsOf(sim).every((b) => Object.keys(b.delivered).length === 0)).toBe(true);
   });
 
-  it('only lays blueprints on clear buildable ground', () => {
+  it('moves what lies on a tile aside when a building goes up there', () => {
+    const { sim, finished } = newColony(9);
+    const stack = itemsOf(sim)[0] as ItemStack;
+    sim.enqueue({ type: 'place-blueprints', payload: { building: 'door', x0: stack.x, y0: stack.y, x1: stack.x, y1: stack.y } });
+    sim.step(TICKS_PER_DAY / 2);
+    expect(finished.map((f) => f.building)).toEqual(['door']);
+    expect(at(sim, CONSTRUCTION_LAYER.item, stack.x, stack.y)).toBe(0);
+    expect(steel(sim)).toBe(300 - 25);
+  });
+
+  it('only lays blueprints on buildable ground', () => {
     const { sim } = newColony(7, { hills: 'mountainous' });
     const rock = rockFaces(sim, 1)[0] as { x: number; y: number };
-    const stack = itemsOf(sim)[0] as ItemStack;
     sim.enqueue({ type: 'place-blueprints', payload: { building: 'door', x0: rock.x, y0: rock.y, x1: rock.x, y1: rock.y } });
-    sim.enqueue({ type: 'place-blueprints', payload: { building: 'door', x0: stack.x, y0: stack.y, x1: stack.x, y1: stack.y } });
     sim.enqueue({ type: 'place-blueprints', payload: { building: 'castle', x0: 0, y0: 0, x1: 3, y1: 3 } });
     sim.step(1);
     expect(blueprintsOf(sim)).toEqual([]);

@@ -1,6 +1,6 @@
 import { Application, Container, Graphics, Sprite, Texture } from 'pixi.js';
 import type { MapSnapshot } from '../protocol';
-import { blueprintOverlay, buildingOverlay, colourMap, designationOverlay, drawItems, snowOverlay } from './mapColours';
+import { blueprintOverlay, buildingOverlay, colourMap, designationOverlay, drawItems, roomOverlay, snowOverlay } from './mapColours';
 import { PawnLayer, type PawnDraw } from './pawnLayer';
 
 /** Screen pixels per tile at zoom 1. */
@@ -22,6 +22,7 @@ export class MapView {
     snow: new Container(),
     building: new Container(),
     items: new Container(),
+    room: new Container(),
     designation: new Container(),
     blueprint: new Container(),
   };
@@ -78,7 +79,8 @@ export class MapView {
     this.night.alpha = 0;
     this.camera.addChild(this.night);
     // Colonists and the player's marks stay visible above the night veil.
-    this.camera.addChild(this.slots.designation, this.slots.blueprint);
+    this.slots.room.visible = false;
+    this.camera.addChild(this.slots.room, this.slots.designation, this.slots.blueprint);
     this.camera.addChild(this.pawns);
     this.camera.addChild(this.areaBox);
     this.updateLayers(map, map.layers);
@@ -89,7 +91,7 @@ export class MapView {
   /** Redraws overlays for layers that changed. `map` holds the latest copy of every layer. */
   updateLayers(map: MapSnapshot, changed: Record<string, ArrayLike<number>>): void {
     // Mining changes the ground itself.
-    if (this.mapSprite && (changed.rock || changed.ore || changed.terrain) && changed !== map.layers) {
+    if (this.mapSprite && (changed.rock || changed.ore || changed.terrain || changed.roof) && changed !== map.layers) {
       const index = this.camera.getChildIndex(this.mapSprite);
       this.mapSprite.destroy();
       this.mapSprite = tileSprite(colourMap(map), map.width, map.height);
@@ -99,12 +101,18 @@ export class MapView {
     if (changed.designation) this.fill('designation', tileSprite(designationOverlay(map, changed.designation), width, height));
     if (changed.snow) this.fill('snow', tileSprite(snowOverlay(map, changed.snow), width, height));
     if (changed.building) this.fill('building', tileSprite(buildingOverlay(map, changed.building), width, height));
+    if (changed.room) this.fill('room', tileSprite(roomOverlay(map, changed.room), width, height));
     if (changed.blueprint) this.fill('blueprint', tileSprite(blueprintOverlay(map, changed.blueprint), width, height));
     if (changed.item || changed['item-count']) {
       const g = new Graphics();
       drawItems(g, map, TILE_PX);
       this.fill('items', g);
     }
+  }
+
+  /** Shows or hides the rooms view. */
+  showRooms(visible: boolean): void {
+    this.slots.room.visible = visible;
   }
 
   /** Replaces what an overlay slot shows. */

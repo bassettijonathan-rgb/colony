@@ -70,6 +70,8 @@ export interface WorldMapService {
    * Returns what was dug, or null when there was no rock.
    */
   mineRock(x: number, y: number): { rock: RockDef; ore: OreDef | null } | null;
+  /** Puts a built roof over an open, unroofed tile. True when a roof was added. */
+  buildRoof(x: number, y: number): boolean;
 }
 
 /**
@@ -101,4 +103,5 @@ export const worldMap = defineService<WorldMapService>('f1-world.map', {
   isWalkable: () => true,
   isBuildable: () => true,
   mineRock: () => null,
+  buildRoof: () => false,
 });

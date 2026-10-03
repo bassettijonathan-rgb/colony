@@ -3,6 +3,7 @@
  * module: layer and component names, signals, commands and the stock service.
  */
 import { defineService, type EntityId } from '../../core';
+import type { BuildingDef } from '../../content/buildings';
 import type { TileArea } from '../c1-work/api';
 
 export const CONSTRUCTION_MODULE_ID = 'c2-construction';
@@ -63,6 +64,14 @@ export interface StockService {
   /** Item id to how many lie on the ground or are being carried, in item order. */
   totals(): Record<string, number>;
 }
+
+export interface StructuresService {
+  /** The finished building on a tile, if any. */
+  buildingAt(x: number, y: number): BuildingDef | null;
+}
+
+/** Without the construction module nothing is built. */
+export const structures = defineService<StructuresService>('c2-construction.structures', { buildingAt: () => null });
 
 /** Without the construction module there are no items. */
 export const stock = defineService<StockService>('c2-construction.stock', { totals: () => ({}) });
